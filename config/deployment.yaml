@@ -1,0 +1,41 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: configmapsecret-manager
+  namespace: kube-system
+  labels:
+    control-plane: configmapsecret-manager
+spec:
+  selector:
+    matchLabels:
+      control-plane: configmapsecret-manager
+  template:
+    metadata:
+      labels:
+        control-plane: configmapsecret-manager
+    spec:
+      containers:
+        - name: manager
+          image: quay.io/machinezone/configmapsecret-manager:latest
+          imagePullPolicy: Always
+          command:
+            - /configmapsecret-manager
+            - --metrics-addr=:9091
+            - --enable-leader-election
+          ports:
+            - name: http-metrics
+              containerPort: 9091
+          livenessProbe:
+            tcpSocket:
+              port: http-metrics
+          resources:
+            limits:
+              cpu: 100m
+              memory: 50Mi
+            requests:
+              cpu: 100m
+              memory: 50Mi
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+      serviceAccountName: configmapsecret-manager

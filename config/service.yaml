@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: configmapsecret-manager
+  namespace: kube-system
+  labels:
+    control-plane: configmapsecret-manager
+spec:
+  selector:
+    control-plane: configmapsecret-manager
+  ports:
+    - name: http-metrics
+      port: 9091
+      targetPort: http-metrics

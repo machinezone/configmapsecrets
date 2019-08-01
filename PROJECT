@@ -1,0 +1,7 @@
+version: "2"
+domain: k8s.mz.com
+repo: github.com/machinezone/configmapsecrets
+resources:
+- group: secrets
+  version: v1alpha1
+  kind: ConfigMapSecret
