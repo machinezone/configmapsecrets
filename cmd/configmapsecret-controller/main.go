@@ -20,9 +20,9 @@ import (
 
 	"github.com/go-logr/zapr"
 	"github.com/machinezone/configmapsecrets/pkg/api/v1alpha1"
+	"github.com/machinezone/configmapsecrets/pkg/buildinfo"
 	"github.com/machinezone/configmapsecrets/pkg/controllers"
 	"github.com/machinezone/configmapsecrets/pkg/mzlog"
-	"github.com/machinezone/configmapsecrets/pkg/version"
 	"go.uber.org/zap"
 	"k8s.io/apimachinery/pkg/runtime"
 	clientscheme "k8s.io/client-go/kubernetes/scheme"
@@ -56,7 +56,7 @@ func main() {
 	log.SetLogger(zapr.NewLogger(logger))
 
 	metrics.Registry.Register(logCfg.Metrics)
-	metrics.Registry.Register(version.Collector())
+	metrics.Registry.Register(buildinfo.Collector())
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme:             scheme,

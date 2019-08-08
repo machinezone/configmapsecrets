@@ -1,6 +1,6 @@
 # API Docs
 
-**Note:** This document is generated from code comments. Do not edit it directly.
+**Note:** This document is generated from code and comments. Do not edit it directly.
 ## Table of Contents
 * [ConfigMapSecret](#configmapsecret)
 * [ConfigMapSecretCondition](#configmapsecretcondition)

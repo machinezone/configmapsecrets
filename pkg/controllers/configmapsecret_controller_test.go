@@ -19,10 +19,9 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 )
 
-const timeout = time.Second * 5
+const timeout = time.Second * 10
 
 func runTests(t *testing.T, tests []test) {
-	// g := gomega.NewWithT(t)
 	r := newTestReconciler(t)
 	var wg sync.WaitGroup
 	for _, test := range tests {

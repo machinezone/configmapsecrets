@@ -25,7 +25,7 @@ export GOFLAGS="-mod=vendor"
 TARGETS=$(for d in "$@"; do echo ./$d/...; done)
 
 echo "Running tests:"
-go test -installsuffix "static" ${TARGETS}
+go test ${TARGETS}
 echo
 
 echo -n "Checking gofmt: "

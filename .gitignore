@@ -1,11 +1,4 @@
-/.go
-/bin
-/.build-*
-/.container-*
-/.dockerfile-*
-/.manifest-*
-/.pull-*
-/.push-*
+/.mage
 
 # Test binary, build with `go test -c`
 *.test

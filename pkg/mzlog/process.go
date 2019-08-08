@@ -4,7 +4,7 @@ import (
 	"os"
 	"runtime"
 
-	"github.com/machinezone/configmapsecrets/pkg/version"
+	"github.com/machinezone/configmapsecrets/pkg/buildinfo"
 	"go.uber.org/zap"
 )
 
@@ -16,17 +16,19 @@ func Process(logger *zap.Logger) {
 		zap.Strings("args", os.Args[1:]),
 	)
 	logger.Info(
-		"version",
-		zap.String("binary", version.Binary()),
-		zap.String("repo", version.Repo()),
-		zap.String("branch", version.Branch()),
-		zap.String("version", version.Version()),
-		zap.String("revision", version.Revision()),
-		zap.Time("build_time", version.BuildTime()),
+		"buildinfo",
+		zap.String("binary", buildinfo.Binary()),
+		zap.String("version", buildinfo.Version()),
+		zap.String("repo", buildinfo.Repo()),
+		zap.String("branch", buildinfo.Branch()),
+		zap.String("revision", buildinfo.Revision()),
+		zap.Time("build_time", buildinfo.BuildTime()),
 	)
 	logger.Info(
 		"runtime",
 		zap.String("version", runtime.Version()),
+		zap.String("os", runtime.GOOS),
+		zap.String("arch", runtime.GOARCH),
 		zap.Int("gomaxprocs", runtime.GOMAXPROCS(0)),
 		zap.Int("cpus", runtime.NumCPU()),
 	)

@@ -43,7 +43,7 @@ func TestMain(m *testing.M) {
 	clientscheme.AddToScheme(scheme)
 	v1alpha1.AddToScheme(scheme)
 	testenv := &envtest.Environment{
-		CRDDirectoryPaths: []string{"../../config"},
+		CRDDirectoryPaths: []string{"../../manifest"},
 	}
 	var err error
 	if cfg, err = testenv.Start(); err != nil {
@@ -54,25 +54,6 @@ func TestMain(m *testing.M) {
 	testenv.Stop()
 	os.Exit(code)
 }
-
-// type testLogWriter struct {
-// 	t   *testing.T
-// 	buf bytes.Buffer
-// }
-//
-// func (t *testLogWriter) Write(p []byte) (int, error) {
-// 	for n := len(p); ; {
-// 		i := bytes.IndexRune(p, '\n')
-// 		if i < 0 {
-// 			t.buf.Write(p)
-// 			return n, nil
-// 		}
-// 		t.buf.Write(p[:i])
-// 		p = p[i+1:]
-// 		t.t.Log(t.buf.String())
-// 		t.buf.Reset()
-// 	}
-// }
 
 type testReconciler struct {
 	cancel func()
@@ -108,8 +89,6 @@ func newTestReconciler(t *testing.T) *testReconciler {
 		waiters: make(map[types.NamespacedName]chan struct{}),
 	}
 	rec := ConfigMapSecret{testNotifyFn: r.notify}
-	// zlog := zapk.RawLoggerTo(&testLogWriter{t: t}, true, zap.AddCaller())
-	// rec.InjectLogger(zapr.NewLogger(zlog))
 	g.Expect(rec.SetupWithManager(mgr)).NotTo(gomega.HaveOccurred())
 
 	go func() {

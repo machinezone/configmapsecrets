@@ -1,25 +1,25 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: configmapsecret-manager
+  name: configmapsecret-controller
   namespace: kube-system
   labels:
-    control-plane: configmapsecret-manager
+    control-plane: configmapsecret-controller
 spec:
   selector:
     matchLabels:
-      control-plane: configmapsecret-manager
+      control-plane: configmapsecret-controller
   template:
     metadata:
       labels:
-        control-plane: configmapsecret-manager
+        control-plane: configmapsecret-controller
     spec:
       containers:
-        - name: manager
-          image: quay.io/machinezone/configmapsecret-manager:latest
+        - name: controller
+          image: mzinc/configmapsecret-controller:latest
           imagePullPolicy: Always
           command:
-            - /configmapsecret-manager
+            - /configmapsecret-controller
             - --metrics-addr=:9091
             - --enable-leader-election
           ports:
@@ -38,4 +38,4 @@ spec:
       securityContext:
         runAsNonRoot: true
         runAsUser: 65534
-      serviceAccountName: configmapsecret-manager
+      serviceAccountName: configmapsecret-controller

@@ -1,4 +1,4 @@
-package version
+package buildinfo
 
 import (
 	"bytes"
@@ -34,7 +34,7 @@ type collector struct {
 	info *prometheus.GaugeVec
 }
 
-// Collector returns a collector for the binary's build version metrics.
+// Collector returns a collector for build info metrics.
 func Collector() prometheus.Collector {
 	var c collector
 	if !buildTime.IsZero() {

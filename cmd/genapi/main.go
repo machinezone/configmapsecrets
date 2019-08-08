@@ -39,7 +39,7 @@ func main() {
 func PrintHeader() {
 	fmt.Println("# API Docs")
 	fmt.Println()
-	fmt.Print("**Note:** This document is generated from code comments. Do not edit it directly.")
+	fmt.Print("**Note:** This document is generated from code and comments. Do not edit it directly.")
 }
 
 func PrintTOC(pkg *Package) {
