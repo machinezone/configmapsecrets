@@ -50,6 +50,11 @@ type ConfigMapSecretList struct {
 // ConfigMapSecretSpec defines the desired state of a ConfigMapSecret.
 type ConfigMapSecretSpec struct {
 	// Template that describes the config that will be rendered.
+	// Variable references $(VAR_NAME) in template data are expanded using the
+	// ConfigMapSecret's variables. If a variable cannot be resolved, the reference
+	// in the input data will be unchanged. The $(VAR_NAME) syntax can be escaped
+	// with a double $$, ie: $$(VAR_NAME). Escaped references will never be expanded,
+	// regardless of whether the variable exists or not.
 	// +optional
 	Template ConfigMapTemplate `json:"template,omitempty"`
 
@@ -87,13 +92,18 @@ type TemplateVariable struct {
 	// Name of the template variable.
 	Name string `json:"name"`
 
-	// Value specifies a local value.
+	// Variable references $(VAR_NAME) are expanded using the previous defined
+	// environment variables in the ConfigMapSecret. If a variable cannot be resolved,
+	// the reference in the input string will be unchanged. The $(VAR_NAME) syntax
+	// can be escaped with a double $$, ie: $$(VAR_NAME). Escaped references will
+	// never be expanded, regardless of whether the variable exists or not.
+	// Defaults to "".
 	// +optional
 	Value string `json:"value,omitempty"`
-	// SecretValue selects a value in a Secret.
+	// SecretValue selects a value by its key in a Secret.
 	// +optional
 	SecretValue *corev1.SecretKeySelector `json:"secretValue,omitempty"`
-	// ConfigMapValue selects a value in a ConfigMap.
+	// ConfigMapValue selects a value by its key in a ConfigMap.
 	// +optional
 	ConfigMapValue *corev1.ConfigMapKeySelector `json:"configMapValue,omitempty"`
 }
