@@ -854,10 +854,13 @@ func deleteConfigMapSecretStep(key types.NamespacedName) step {
 func checkStatusStep(ok bool, key types.NamespacedName) step {
 	return func(ctx context.Context, t *testing.T, r *testReconciler) {
 		t.Run("check-status", func(t *testing.T) {
+			var obj v1alpha1.ConfigMapSecret
+			eventually(t, timeout, r.wait(key), func(g *gomega.WithT) {
+				obj = v1alpha1.ConfigMapSecret{} // reset
+				g.Expect(r.api.Get(ctx, key, &obj)).NotTo(gomega.HaveOccurred(), "Get ConfigMapSecret")
+				g.Expect(obj.Status.ObservedGeneration).To(gomega.Equal(obj.Generation), "Observed Generation")
+			})
 			g := gomega.NewWithT(t)
-			obj := &v1alpha1.ConfigMapSecret{}
-			g.Expect(r.api.Get(ctx, key, obj)).NotTo(gomega.HaveOccurred(), "Get ConfigMapSecret")
-			g.Expect(obj.Status.ObservedGeneration).To(gomega.Equal(obj.Generation), "Observed Generation")
 			g.Expect(obj.Status.Conditions).To(gomega.HaveLen(1), "Conditions")
 			cond := obj.Status.Conditions[0]
 			g.Expect(cond.Type).To(gomega.Equal(v1alpha1.ConfigMapSecretRenderFailure), "Condition Type")
