@@ -21,6 +21,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -145,6 +146,7 @@ func (r *ConfigMapSecret) sync(ctx context.Context, log logr.Logger, cms *v1alph
 	secret, reason, err := r.renderSecret(ctx, cms)
 	if err != nil {
 		if isConfigError(err) {
+			// TODO: controller-runtime will still log this as an error... is there any way to avoid it?
 			log.Info("Unable to render ConfigMapSecret", "warning", err)
 		} else {
 			log.Error(err, "Unable to render ConfigMapSecret")
@@ -153,36 +155,67 @@ func (r *ConfigMapSecret) sync(ctx context.Context, log logr.Logger, cms *v1alph
 		return err
 	}
 
+	key := types.NamespacedName{Namespace: secret.Namespace, Name: secret.Name}
+	secretLog := log.WithValues("secret", key)
+
 	// Check if the Secret already exists
 	found := &corev1.Secret{}
-	key := types.NamespacedName{Namespace: secret.Namespace, Name: secret.Name}
-
 	if err := r.client.Get(ctx, key, found); err != nil {
 		if apierrors.IsNotFound(err) {
-			log.Info("Creating Secret", "secret", key)
+			secretLog.Info("Creating Secret")
 			if err := r.client.Create(ctx, secret); err != nil {
-				log.Error(err, "Unable to create Secret", "secret", key)
+				secretLog.Error(err, "Unable to create Secret")
 				return err
 			}
 			return r.syncSuccessStatus(ctx, log, cms)
 		}
+		secretLog.Error(err, "Unable to get Secret")
 		return err
 	}
-	// TODO: Confirm/take ownership?
+
+	// Confirm or take ownership.
+	ownerChanged, err := r.setOwner(secretLog, cms, found)
+	if err != nil {
+		return err
+	}
 
 	// Update the object and write the result back if there are any changes
-	if shouldUpdate(found, secret) {
+	if ownerChanged || shouldUpdate(found, secret) {
 		found.Labels = secret.Labels
 		found.Annotations = secret.Annotations
 		found.Data = secret.Data
 		found.Type = secret.Type
-		log.Info("Updating Secret", "secret", key)
+		secretLog.Info("Updating Secret")
 		if err := r.client.Update(ctx, found); err != nil {
-			log.Error(err, "Unable to update Secret", "secret", key)
+			secretLog.Error(err, "Unable to update Secret")
 			return err
 		}
 	}
 	return r.syncSuccessStatus(ctx, log, cms)
+}
+
+func (r *ConfigMapSecret) setOwner(log logr.Logger, cms *v1alpha1.ConfigMapSecret, secret *corev1.Secret) (bool, error) {
+	gvk, err := apiutil.GVKForObject(cms, r.scheme)
+	if err != nil {
+		return false, err
+	}
+	owner := metav1.NewControllerRef(cms, gvk)
+	for i, ref := range cms.OwnerReferences {
+		if ref.Controller == nil || !*ref.Controller {
+			continue
+		}
+		if ref.UID != cms.UID {
+			log.Error(err, "Secret has a different owner", "owner", ref)
+			return false, &controllerutil.AlreadyOwnedError{Object: cms, Owner: ref}
+		}
+		if ref != *owner { // e.g. apiVersion upgraded
+			cms.OwnerReferences[i] = *owner
+			return true, nil
+		}
+		return false, nil
+	}
+	cms.OwnerReferences = append(cms.OwnerReferences, *owner)
+	return true, nil
 }
 
 func shouldUpdate(a, b *corev1.Secret) bool {
