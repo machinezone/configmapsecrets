@@ -53,7 +53,8 @@ func main() {
 
 	logger := mzlog.NewZapLogger(logCfg)
 	mzlog.Process(logger)
-	log.SetLogger(zapr.NewLogger(logger))
+	// TODO(abursavich): remove CallerSkip when https://github.com/go-logr/zapr/issues/6 is fixed
+	log.SetLogger(zapr.NewLogger(logger.WithOptions(zap.AddCallerSkip(1))))
 
 	metrics.Registry.Register(logCfg.Metrics)
 	metrics.Registry.Register(buildinfo.Collector())
