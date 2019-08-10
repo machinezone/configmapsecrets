@@ -11,9 +11,18 @@ rules:
   resources:
   - configmaps
   verbs:
+  - create
   - get
   - list
+  - update
   - watch
+- apiGroups:
+  - ""
+  resources:
+  - events
+  verbs:
+  - create
+  - patch
 - apiGroups:
   - ""
   resources:

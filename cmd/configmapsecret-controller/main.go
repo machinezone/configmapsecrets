@@ -63,6 +63,7 @@ func main() {
 		Scheme:             scheme,
 		MetricsBindAddress: metricsAddr,
 		LeaderElection:     enableLeaderElection,
+		LeaderElectionID:   "configmapsecret-controller-leader",
 	})
 	if err != nil {
 		logger.Fatal("Unable to start manager", zap.Error(err))

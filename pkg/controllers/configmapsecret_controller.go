@@ -110,6 +110,10 @@ func (r *ConfigMapSecret) setRefs(namespace, name string, secrets, configMaps ma
 	r.configMaps.set(namespace, name, configMaps)
 }
 
+// Leader election:
+// +kubebuilder:rbac:groups=core,resources=configmaps,verbs=get;create;update
+// +kubebuilder:rbac:groups=core,resources=events,verbs=create;patch
+
 // +kubebuilder:rbac:groups=core,resources=configmaps,verbs=get;list;watch
 // +kubebuilder:rbac:groups=core,resources=secrets,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=secrets.k8s.mz.com,resources=configmapsecrets,verbs=get;list;watch;update;patch;delete
