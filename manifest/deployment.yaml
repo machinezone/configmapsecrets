@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
         - name: controller
-          image: mzinc/configmapsecret-controller:latest
+          image: mzinc/configmapsecret-controller:v0.1.0
           imagePullPolicy: Always
           command:
             - /configmapsecret-controller

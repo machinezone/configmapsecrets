@@ -67,7 +67,7 @@ func (t *target) Branch() string {
 
 func (t *target) initRepoData() error {
 	var err error
-	t.version, err = sh.Output("git", "describe", "--tags", "--always", "--long", "--dirty", "--abbrev=12")
+	t.version, err = sh.Output("git", "describe", "--tags", "--always", "--dirty", "--abbrev=12")
 	if err != nil {
 		return err
 	}
