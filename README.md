@@ -22,3 +22,130 @@ Secret data secure.
 ```
 kubectl apply -f manifest/*.yaml
 ```
+
+## Example
+
+### Input
+```yaml
+apiVersion: secrets.k8s.mz.com/v1alpha
+kind: ConfigMapSecret
+metadata:
+  name: alertmanager-config
+  namespace: monitoring
+  labels:
+    app: alertmanager
+spec:
+  template:
+    metadata:
+      # optional: defaults to same as ConfigMapSecret
+      name: alertmanager-config
+      labels:
+        app: alertmanager
+    data:
+      alertmanager.yaml: |
+          global:
+            resolve_timeout: 5m
+            opsgenie_api_key: $(OPSGENIE_API_KEY)
+            slack_api_url: $(SLACK_API_URL)
+          route:
+            receiver: default
+            group_by: ["alertname", "job", "team"]
+            group_wait: 30s
+            group_interval: 5m
+            repeat_interval: 12h
+            routes:
+              - receiver: foobar-sre
+                match:
+                  team: foobar-sre
+              - receiver: widget-sre
+                match:
+                  team: widget-sre
+          receivers:
+            - name: default
+              slack_configs:
+                - channel: unrouted-alerts
+            - name: foobar-sre
+              opsgenie_configs:
+                - responders:
+                    - name: foobar-sre
+                      type: team
+              slack_configs:
+                - channel: foobar-sre-alerts
+            - name: widget-sre
+              opsgenie_configs:
+                - responders:
+                    - name: widget-sre
+                      type: team
+              slack_configs:
+                - channel: widget-sre
+  vars:
+    - name: OPSGENIE_API_KEY
+      secretValue:
+        name: alertmanager-keys
+        key: opsgenieKey
+    - name: SLACK_API_URL
+      secretValue:
+        name: alertmanager-keys
+        key: slackURL
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: alertmanager-keys
+  namespace: monitoring
+  labels:
+    app: alertmanager
+stringData:
+  opsgenieKey: 9eccf784-bbad-11e9-9cb5-2a2ae2dbcce4
+  slackURL: https://hooks.slack.com/services/EFNPN1/EVU44X/J51NVTYSKwuPtCz3
+type: Opaque
+```
+
+### Output
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: alertmanager-config
+  namespace: monitoring
+  labels:
+    app: alertmanager
+stringData:
+  alertmanager.yaml: |
+    global:
+      resolve_timeout: 5m
+      opsgenie_api_key: 9eccf784-bbad-11e9-9cb5-2a2ae2dbcce4
+      slack_api_url: https://hooks.slack.com/services/EFNPN1/EVU44X/J51NVTYSKwuPtCz3
+    route:
+      receiver: default
+      group_by: ["alertname", "job", "team"]
+      group_wait: 30s
+      group_interval: 5m
+      repeat_interval: 12h
+      routes:
+        - receiver: foobar-sre
+          match:
+           team: foobar-sre
+        - receiver: widget-sre
+          match:
+            team: widget-sre
+    receivers:
+      - name: default
+        slack_configs:
+          - channel: unrouted-alerts
+      - name: foobar-sre
+        opsgenie_configs:
+          - responders:
+              - name: foobar-sre
+                type: team
+        slack_configs:
+          - channel: foobar-sre
+      - name: widget-sre
+        opsgenie_configs:
+          - responders:
+              - name: widget-sre
+                type: team
+        slack_configs:
+          - channel: widget-sre
+type: Opaque
+```
