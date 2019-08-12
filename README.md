@@ -1,5 +1,7 @@
 # ConfigMapSecrets
 
+[![Release](https://img.shields.io/github/release/machinezone/configmapsecrets)](https://github.com/machinezone/configmapsecrets/releases) [![API Reference](https://img.shields.io/badge/API-reference-blue)](/docs/api.md) [![Go Report Card](https://goreportcard.com/badge/github.com/machinezone/configmapsecrets)](https://goreportcard.com/report/github.com/machinezone/configmapsecrets) [![License](https://img.shields.io/github/license/machinezone/configmapsecrets.svg)](/LICENSE)
+
 ### Problem
 I have [a config](https://prometheus.io/docs/alerting/configuration/) that contains a mixture
 of secret and non-secret data. For [some reason](https://github.com/prometheus/alertmanager/issues/504)
@@ -8,11 +10,11 @@ into source control, keep my secret data secure, and keep my non-secret data eas
 readable and editable.
 
 ### Solution
-Use a [ConfigMapSecret](docs/api.md) which is safe to store in source control. It's like a
-ConfigMap that includes your non-secret data, but it can reference Secret variables, similar to how
-[Container](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.15/#container-v1-core)
-args can reference env variables. The expanded ConfigMapSecret will be rendered into a Secret
-in the same namespace by a controller in the cluster. 
+Use a [ConfigMapSecret](docs/api.md#configmapsecret) which is safe to store in source control. It's like
+a ConfigMap that includes your non-secret data, but it can reference Secret variables, similar to how
+[container](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.15/#container-v1-core)
+args can reference env variables. The controller will expand and render it into a Secret in the same
+namespace, keeping it updated to reflect changes to the ConfigMapSecret or its referenced variables.
 
 Use [SealedSecrets](https://github.com/bitnami-labs/sealed-secrets) to keep your referenced
 Secret data secure.
