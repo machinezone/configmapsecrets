@@ -204,7 +204,7 @@ func (r *ConfigMapSecret) setOwner(log logr.Logger, cms *v1alpha1.ConfigMapSecre
 		return false, err
 	}
 	owner := metav1.NewControllerRef(cms, gvk)
-	for i, ref := range cms.OwnerReferences {
+	for i, ref := range secret.OwnerReferences {
 		if ref.Controller == nil || !*ref.Controller {
 			continue
 		}
@@ -212,13 +212,15 @@ func (r *ConfigMapSecret) setOwner(log logr.Logger, cms *v1alpha1.ConfigMapSecre
 			log.Error(err, "Secret has a different owner", "owner", ref)
 			return false, &controllerutil.AlreadyOwnedError{Object: cms, Owner: ref}
 		}
-		if ref != *owner { // e.g. apiVersion upgraded
-			cms.OwnerReferences[i] = *owner
+		if !reflect.DeepEqual(&ref, owner) { // e.g. apiVersion changed
+			log.Info("Updating ownership of Secret")
+			secret.OwnerReferences[i] = *owner
 			return true, nil
 		}
 		return false, nil
 	}
-	cms.OwnerReferences = append(cms.OwnerReferences, *owner)
+	log.Info("Taking ownership of Secret", "owner", *owner)
+	cms.OwnerReferences = append(secret.OwnerReferences, *owner)
 	return true, nil
 }
 
