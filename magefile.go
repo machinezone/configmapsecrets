@@ -22,9 +22,8 @@ import (
 )
 
 const (
-	name     = "configmapsecret-controller"
-	repo     = "github.com/machinezone/configmapsecrets"
-	registry = "registry.hub.docker.com/mzinc"
+	name = "configmapsecret-controller"
+	repo = "github.com/machinezone/configmapsecrets"
 
 	goVersion  = "1.12"
 	buildImage = "golang:" + goVersion + "-alpine"
@@ -63,6 +62,13 @@ func (t *target) Revision() string {
 func (t *target) Branch() string {
 	mg.Deps(t.initRepoData)
 	return t.branch
+}
+
+func (t *target) Registry() string {
+	if s := os.Getenv("REGISTRY"); s != "" {
+		return s
+	}
+	return "registry.hub.docker.com/mzinc"
 }
 
 func (t *target) initRepoData() error {
@@ -485,7 +491,7 @@ func Image() error {
 }
 
 func manifest() string {
-	return fmt.Sprintf("%s/%s:%s", registry, trg.Name(), trg.Version())
+	return fmt.Sprintf("%s/%s:%s", trg.Registry(), trg.Name(), trg.Version())
 }
 
 func image(arch string) string { return manifest() + "__linux_" + arch }
