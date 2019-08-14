@@ -266,87 +266,97 @@ func (r *ConfigMapSecret) renderSecret(ctx context.Context, cms *v1alpha1.Config
 
 // Same logic as container env vars: Kubelet.makeEnvironmentVariables
 // https://github.com/kubernetes/kubernetes/blob/master/pkg/kubelet/kubelet_pods.go
-func (r *ConfigMapSecret) makeVariables(ctx context.Context, cms *v1alpha1.ConfigMapSecret) (map[string]string, error) {
-	var (
-		ns         = cms.Namespace
-		vars       = make(map[string]string)
-		mappingFn  = expansion.MappingFuncFor(vars)
-		configMaps = make(map[string]*corev1.ConfigMap)
-		secrets    = make(map[string]*corev1.Secret)
-	)
+func (r *ConfigMapSecret) makeVariables(ctx context.Context, cms *v1alpha1.ConfigMapSecret) (vars map[string]string, err error) {
+	vars = make(map[string]string)
+	mappingFn := expansion.MappingFuncFor(vars)
+	configMaps := make(map[string]*corev1.ConfigMap)
+	secrets := make(map[string]*corev1.Secret)
 
 	for _, v := range cms.Spec.Vars {
 		val := v.Value
+		found := true
 
 		switch {
 		case val != "":
 			val = expansion.Expand(val, mappingFn)
-
 		case v.SecretValue != nil:
-			ref := v.SecretValue
-			key := ref.Key
-			name := ref.Name
-			optional := ref.Optional != nil && *ref.Optional
-			secret, ok := secrets[name]
-			if !ok {
-				secret = &corev1.Secret{}
-				err := r.client.Get(ctx, types.NamespacedName{Namespace: ns, Name: name}, secret)
-				if err != nil {
-					if apierrors.IsNotFound(err) {
-						if optional {
-							continue
-						}
-						return nil, &configError{err}
-					}
-					return nil, err
-				}
-				secrets[name] = secret
-			}
-			buf, ok := secret.Data[key]
-			if !ok {
-				if optional {
-					continue
-				}
-				return nil, newConfigError("Couldn't find key %s in Secret %s/%s", key, ns, name)
-			}
-			val = string(buf)
-
+			val, found, err = r.secretValue(ctx, secrets, cms.Namespace, v.SecretValue)
 		case v.ConfigMapValue != nil:
-			ref := v.ConfigMapValue
-			key := ref.Key
-			name := ref.Name
-			optional := ref.Optional != nil && *ref.Optional
-			configMap, ok := configMaps[name]
-			if !ok {
-				configMap = &corev1.ConfigMap{}
-				err := r.client.Get(ctx, types.NamespacedName{Namespace: ns, Name: name}, configMap)
-				if err != nil {
-					if apierrors.IsNotFound(err) {
-						if optional {
-							continue
-						}
-						return nil, &configError{err}
-					}
-					return nil, err
-				}
-				configMaps[name] = configMap
-			}
-			if data, ok := configMap.Data[key]; ok {
-				val = data
-			} else if data, ok := configMap.BinaryData[key]; ok {
-				val = string(data)
-			} else if optional {
-				continue
-			} else {
-				return nil, newConfigError("Couldn't find key %s in ConfigMap %s/%s", key, ns, name)
-			}
+			val, found, err = r.configMapValue(ctx, configMaps, cms.Namespace, v.ConfigMapValue)
+		}
 
+		if err != nil {
+			return nil, err
+		}
+		if !found {
+			continue
 		}
 
 		vars[v.Name] = val
 	}
 
 	return vars, nil
+}
+
+func (r *ConfigMapSecret) secretValue(ctx context.Context, cache map[string]*corev1.Secret, namespace string, ref *corev1.SecretKeySelector) (value string, found bool, err error) {
+	name := ref.Name
+	key := ref.Key
+	optional := ref.Optional != nil && *ref.Optional
+
+	secret, found := cache[name]
+	if !found {
+		secret = &corev1.Secret{}
+		err := r.client.Get(ctx, types.NamespacedName{Namespace: namespace, Name: name}, secret)
+		if err != nil {
+			if apierrors.IsNotFound(err) {
+				if optional {
+					return "", false, nil
+				}
+				return "", false, &configError{err}
+			}
+			return "", false, err
+		}
+		cache[name] = secret
+	}
+	if buf, found := secret.Data[key]; found {
+		return string(buf), true, nil
+	}
+	if optional {
+		return "", false, nil
+	}
+	return "", false, newConfigError("Couldn't find key %s in Secret %s/%s", key, namespace, name)
+}
+
+func (r *ConfigMapSecret) configMapValue(ctx context.Context, cache map[string]*corev1.ConfigMap, namespace string, ref *corev1.ConfigMapKeySelector) (value string, found bool, err error) {
+	name := ref.Name
+	key := ref.Key
+	optional := ref.Optional != nil && *ref.Optional
+
+	configMap, found := cache[name]
+	if !found {
+		configMap = &corev1.ConfigMap{}
+		err := r.client.Get(ctx, types.NamespacedName{Namespace: namespace, Name: name}, configMap)
+		if err != nil {
+			if apierrors.IsNotFound(err) {
+				if optional {
+					return "", false, nil
+				}
+				return "", false, &configError{err}
+			}
+			return "", false, err
+		}
+		cache[name] = configMap
+	}
+	if str, found := configMap.Data[key]; found {
+		return str, true, nil
+	}
+	if buf, found := configMap.BinaryData[key]; found {
+		return string(buf), true, nil
+	}
+	if optional {
+		return "", false, nil
+	}
+	return "", false, newConfigError("Couldn't find key %s in ConfigMap %s/%s", key, namespace, name)
 }
 
 func (r *ConfigMapSecret) syncSuccessStatus(ctx context.Context, log logr.Logger, cms *v1alpha1.ConfigMapSecret) error {
