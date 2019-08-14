@@ -8,6 +8,7 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"flag"
 	"fmt"
@@ -15,6 +16,7 @@ import (
 	"go/doc"
 	"go/parser"
 	"go/token"
+	"io"
 	"log"
 	"os"
 	"path"
@@ -31,35 +33,42 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	PrintHeader()
-	PrintTOC(pkg)
-	PrintStructs(pkg)
+	WriteMarkdown(os.Stdout, pkg)
 }
 
-func PrintHeader() {
-	fmt.Println("# API Docs")
-	fmt.Println()
-	fmt.Print("**Note:** This document is generated from code and comments. Do not edit it directly.")
+// WriteMarkdown writes the API of pkg as markdown to w.
+func WriteMarkdown(w io.Writer, pkg *Package) error {
+	b := bufio.NewWriter(w)
+	printHeader(b)
+	printTOC(b, pkg)
+	printStructs(b, pkg)
+	return b.Flush()
 }
 
-func PrintTOC(pkg *Package) {
-	fmt.Printf("\n## Table of Contents\n")
+func printHeader(w io.Writer) {
+	fmt.Fprintln(w, "# API")
+	fmt.Fprintln(w)
+	fmt.Fprint(w, "**Note:** This document is generated from code and comments. Do not edit it directly.")
+}
+
+func printTOC(w io.Writer, pkg *Package) {
+	fmt.Fprintf(w, "\n## Table of Contents\n")
 	for _, s := range sortedStructs(pkg.Structs) {
-		fmt.Printf("* %s\n", mdSectionLink(s.Name))
+		fmt.Fprintf(w, "* %s\n", mdSectionLink(s.Name))
 	}
 }
 
-func PrintStructs(pkg *Package) {
+func printStructs(w io.Writer, pkg *Package) {
 	for _, s := range sortedStructs(pkg.Structs) {
-		fmt.Printf("\n## %s\n\n%s\n\n", s.Name, s.Doc)
+		fmt.Fprintf(w, "\n## %s\n\n%s\n\n", s.Name, s.Doc)
 
-		fmt.Println("| Field | Description | Type | Required |")
-		fmt.Println("| ----- | ----------- | ---- | -------- |")
+		fmt.Fprintln(w, "| Field | Description | Type | Required |")
+		fmt.Fprintln(w, "| ----- | ----------- | ---- | -------- |")
 		for _, f := range s.Fields {
-			fmt.Println("|", f.Name, "|", f.Doc, "|", mdType(pkg, f.Type), "|", f.Required, "|")
+			fmt.Fprintln(w, "|", f.Name, "|", f.Doc, "|", mdType(pkg, f.Type), "|", f.Required, "|")
 		}
-		fmt.Println("")
-		fmt.Println("[Back to TOC](#table-of-contents)")
+		fmt.Fprintln(w, "")
+		fmt.Fprintln(w, "[Back to TOC](#table-of-contents)")
 	}
 }
 
@@ -122,6 +131,7 @@ func importPath(pkg *Package, exp ast.Expr, pkgID string) (string, bool) {
 	return "", false
 }
 
+// A Package represents a package.
 type Package struct {
 	FileSet *token.FileSet
 	AstPkg  *ast.Package
@@ -130,6 +140,7 @@ type Package struct {
 	Structs map[string]Struct
 }
 
+// ParseDir parses the package in the given path.
 func ParseDir(path string) (*Package, error) {
 	fset := token.NewFileSet()
 	pkgs, err := parser.ParseDir(fset, path, ignoreTests, parser.ParseComments)
@@ -158,6 +169,7 @@ func ignoreTests(f os.FileInfo) bool {
 	return !strings.HasSuffix("_test.go", f.Name())
 }
 
+// A Struct represents a struct.
 type Struct struct {
 	Name   string
 	Doc    string
@@ -177,6 +189,7 @@ func newStruct(dt *doc.Type, st *ast.StructType) Struct {
 	return s
 }
 
+// A Field represents a struct field.
 type Field struct {
 	Name     string
 	Doc      string
