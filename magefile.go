@@ -6,6 +6,7 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"log"
 	"os"
@@ -16,6 +17,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/machinezone/configmapsecrets/pkg/genapi"
 	"github.com/magefile/mage/mg"
 	"github.com/magefile/mage/sh"
 	magetarget "github.com/magefile/mage/target"
@@ -430,12 +432,15 @@ func generateRBAC() error {
 }
 
 func generateDocs() error {
-	// TODO(abursavich): extract genapi command logic into package and call directly
-	out, err := sh.Output("go", "run", "cmd/genapi/main.go", "pkg/api/v1alpha1")
+	pkg, err := genapi.ParseDir("pkg/api/v1alpha1")
 	if err != nil {
 		return err
 	}
-	return writeFile("docs/api.md", out)
+	buf := bytes.NewBuffer(nil)
+	if err := genapi.WriteMarkdown(buf, pkg); err != nil {
+		return err
+	}
+	return writeFile("docs/api.md", buf.String())
 }
 
 // Removes build artifacts.
@@ -632,8 +637,7 @@ func writeFile(path, msg string) error {
 		return err
 	}
 	defer f.Close()
-	_, err = fmt.Fprintln(f, msg)
-	return err
+	return writeLine(f, msg)
 }
 
 func appendFile(path, msg string) error {
@@ -645,7 +649,15 @@ func appendFile(path, msg string) error {
 		return err
 	}
 	defer f.Close()
-	_, err = fmt.Fprintln(f, msg)
+	return writeLine(f, msg)
+}
+
+func writeLine(w io.Writer, msg string) error {
+	if strings.HasSuffix(msg, "\n") {
+		_, err := fmt.Fprint(w, msg)
+		return err
+	}
+	_, err := fmt.Fprintln(w, msg)
 	return err
 }
 
@@ -656,8 +668,5 @@ func mkDir(path string) error {
 
 func rmDir(path string) error {
 	log.Printf("removing directory: %s", path)
-	if err := os.RemoveAll(path); err != nil && !os.IsNotExist(err) {
-		return nil
-	}
-	return nil
+	return os.RemoveAll(path)
 }

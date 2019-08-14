@@ -5,19 +5,17 @@
 // This code is heavily inspired by prometheus-operator's API doc generation:
 // https://github.com/coreos/prometheus-operator/blob/master/cmd/po-docgen/api.go
 
-package main
+package genapi
 
 import (
 	"bufio"
 	"bytes"
-	"flag"
 	"fmt"
 	"go/ast"
 	"go/doc"
 	"go/parser"
 	"go/token"
 	"io"
-	"log"
 	"os"
 	"path"
 	"reflect"
@@ -25,16 +23,6 @@ import (
 	"strconv"
 	"strings"
 )
-
-func main() {
-	flag.Parse()
-
-	pkg, err := ParseDir(flag.Arg(0))
-	if err != nil {
-		log.Fatal(err)
-	}
-	WriteMarkdown(os.Stdout, pkg)
-}
 
 // WriteMarkdown writes the API of pkg as markdown to w.
 func WriteMarkdown(w io.Writer, pkg *Package) error {
