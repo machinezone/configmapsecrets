@@ -29,46 +29,41 @@ func init() {
 	}
 }
 
-type collector struct {
-	time prometheus.Gauge
-	info *prometheus.GaugeVec
-}
-
 // Collector returns a collector for build info metrics.
 func Collector() prometheus.Collector {
-	var c collector
-	if !buildTime.IsZero() {
-		c.time = prometheus.NewGauge(
-			prometheus.GaugeOpts{
-				Name: "build_time",
-				Help: "Build time as Unix timestamp",
-			},
-		)
-		c.time.Set(float64(buildTime.Unix()))
-	}
-	c.info = prometheus.NewGaugeVec(
+	info := prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
 			Name: "build_info",
 			Help: "Build information (binary, version, repo, revision, branch)",
 		},
 		[]string{"binary", "version", "repo", "revision", "branch"},
 	)
-	c.info.WithLabelValues(binary, version, repo, revision, branch).Set(1)
-	return &c
+	info.WithLabelValues(binary, version, repo, revision, branch).Set(1)
+	if buildTime.IsZero() {
+		return info
+	}
+	time := prometheus.NewGauge(
+		prometheus.GaugeOpts{
+			Name: "build_time",
+			Help: "Build time as Unix timestamp",
+		},
+	)
+	time.Set(float64(buildTime.Unix()))
+	return collectors{info, time}
 }
 
-func (c *collector) Describe(ch chan<- *prometheus.Desc) {
-	if c.time != nil {
-		c.time.Describe(ch)
+type collectors []prometheus.Collector
+
+func (s collectors) Describe(ch chan<- *prometheus.Desc) {
+	for _, c := range s {
+		c.Describe(ch)
 	}
-	c.info.Describe(ch)
 }
 
-func (c *collector) Collect(ch chan<- prometheus.Metric) {
-	if c.time != nil {
-		c.time.Collect(ch)
+func (s collectors) Collect(ch chan<- prometheus.Metric) {
+	for _, c := range s {
+		c.Collect(ch)
 	}
-	c.info.Collect(ch)
 }
 
 var tmpl = template.Must(template.New("version").Parse(`{{.binary}}
