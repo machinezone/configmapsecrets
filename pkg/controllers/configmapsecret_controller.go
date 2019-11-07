@@ -143,20 +143,20 @@ func (r *ConfigMapSecret) Reconcile(req reconcile.Request) (reconcile.Result, er
 	secretNames, configMapNames := varRefs(cms.Spec.Vars)
 	r.setRefs(cms.Namespace, cms.Name, secretNames, configMapNames)
 
-	return reconcile.Result{}, r.sync(ctx, log, cms)
+	requeue, err := r.sync(ctx, log, cms)
+	return reconcile.Result{Requeue: requeue}, err
 }
 
-func (r *ConfigMapSecret) sync(ctx context.Context, log logr.Logger, cms *v1alpha1.ConfigMapSecret) error {
+func (r *ConfigMapSecret) sync(ctx context.Context, log logr.Logger, cms *v1alpha1.ConfigMapSecret) (bool, error) {
 	secret, reason, err := r.renderSecret(ctx, cms)
 	if err != nil {
+		defer r.syncRenderFailureStatus(ctx, log, cms, reason, err.Error())
 		if isConfigError(err) {
-			// TODO: controller-runtime will still log this as an error... is there any way to avoid it?
 			log.Info("Unable to render ConfigMapSecret", "warning", err)
-		} else {
-			log.Error(err, "Unable to render ConfigMapSecret")
+			return true, nil
 		}
-		r.syncRenderFailureStatus(ctx, log, cms, reason, err.Error())
-		return err
+		log.Error(err, "Unable to render ConfigMapSecret")
+		return false, err
 	}
 
 	key := types.NamespacedName{Namespace: secret.Namespace, Name: secret.Name}
@@ -169,18 +169,18 @@ func (r *ConfigMapSecret) sync(ctx context.Context, log logr.Logger, cms *v1alph
 			secretLog.Info("Creating Secret")
 			if err := r.client.Create(ctx, secret); err != nil {
 				secretLog.Error(err, "Unable to create Secret")
-				return err
+				return false, err
 			}
-			return r.syncSuccessStatus(ctx, log, cms)
+			return false, r.syncSuccessStatus(ctx, log, cms)
 		}
 		secretLog.Error(err, "Unable to get Secret")
-		return err
+		return false, err
 	}
 
 	// Confirm or take ownership.
 	ownerChanged, err := r.setOwner(secretLog, cms, found)
 	if err != nil {
-		return err
+		return false, err
 	}
 
 	// Update the object and write the result back if there are any changes
@@ -192,10 +192,10 @@ func (r *ConfigMapSecret) sync(ctx context.Context, log logr.Logger, cms *v1alph
 		secretLog.Info("Updating Secret")
 		if err := r.client.Update(ctx, found); err != nil {
 			secretLog.Error(err, "Unable to update Secret")
-			return err
+			return false, err
 		}
 	}
-	return r.syncSuccessStatus(ctx, log, cms)
+	return false, r.syncSuccessStatus(ctx, log, cms)
 }
 
 func (r *ConfigMapSecret) setOwner(log logr.Logger, cms *v1alpha1.ConfigMapSecret, secret *corev1.Secret) (bool, error) {
