@@ -18,11 +18,14 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/util/workqueue"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
@@ -41,6 +44,7 @@ type ConfigMapSecret struct {
 	mu         sync.RWMutex
 	secrets    refMap
 	configMaps refMap
+	owned      refMap
 
 	testNotifyFn func(types.NamespacedName)
 }
@@ -68,10 +72,23 @@ func (r *ConfigMapSecret) SetupWithManager(manager manager.Manager) error {
 	if r.logger == nil {
 		r.InjectLogger(pkgLog)
 	}
+
 	return builder.ControllerManagedBy(manager).
 		For(&v1alpha1.ConfigMapSecret{}).
-		Owns(&corev1.Secret{}).
-		Watches(&source.Kind{Type: &corev1.Secret{}}, r.secretEventHandler()).
+		Watches(&source.Kind{Type: &corev1.Secret{}}, handler.Funcs{
+			CreateFunc: func(e event.CreateEvent, q workqueue.RateLimitingInterface) {
+				r.secretEventHandler(q, e.Object.(*corev1.Secret), false)
+			},
+			UpdateFunc: func(e event.UpdateEvent, q workqueue.RateLimitingInterface) {
+				r.secretEventHandler(q, e.ObjectNew.(*corev1.Secret), false)
+			},
+			DeleteFunc: func(e event.DeleteEvent, q workqueue.RateLimitingInterface) {
+				r.secretEventHandler(q, e.Object.(*corev1.Secret), true)
+			},
+			GenericFunc: func(e event.GenericEvent, q workqueue.RateLimitingInterface) {
+				r.secretEventHandler(q, e.Object.(*corev1.Secret), false)
+			},
+		}).
 		Watches(&source.Kind{Type: &corev1.ConfigMap{}}, r.configMapEventHandler()).
 		Complete(r)
 }
@@ -89,16 +106,38 @@ func (r *ConfigMapSecret) configMapEventHandler() handler.EventHandler {
 	}
 }
 
-func (r *ConfigMapSecret) secretEventHandler() handler.EventHandler {
-	return &handler.EnqueueRequestsFromMapFunc{
-		ToRequests: handler.ToRequestsFunc(func(obj handler.MapObject) []reconcile.Request {
-			namespace := obj.Meta.GetNamespace()
-			name := obj.Meta.GetName()
+func (r *ConfigMapSecret) secretEventHandler(q workqueue.RateLimitingInterface, secret *corev1.Secret, deleted bool) {
+	name := secret.Name
+	namespace := secret.Namespace
+	owner := getOwner(secret)
 
-			r.mu.RLock()
-			defer r.mu.RUnlock()
-			return toReqs(namespace, r.secrets.srcs(namespace, name))
-		}),
+	r.mu.Lock()
+	if deleted || owner == nil {
+		r.owned.set(namespace, name, nil)
+	} else {
+		r.owned.set(namespace, name, map[string]bool{string(owner.UID): true})
+	}
+	cmsNames := keys(r.secrets.srcs(namespace, name))
+	r.mu.Unlock()
+
+	if owner != nil {
+		q.Add(reconcile.Request{
+			NamespacedName: types.NamespacedName{
+				Namespace: namespace,
+				Name:      owner.Name,
+			},
+		})
+	}
+	for _, cmsName := range cmsNames {
+		if owner != nil && owner.Name == cmsName {
+			continue
+		}
+		q.Add(reconcile.Request{
+			NamespacedName: types.NamespacedName{
+				Namespace: namespace,
+				Name:      cmsName,
+			},
+		})
 	}
 }
 
@@ -143,8 +182,48 @@ func (r *ConfigMapSecret) Reconcile(req reconcile.Request) (reconcile.Result, er
 	secretNames, configMapNames := varRefs(cms.Spec.Vars)
 	r.setRefs(cms.Namespace, cms.Name, secretNames, configMapNames)
 
+	// Sync and cleanup
 	requeue, err := r.sync(ctx, log, cms)
+	if cleanupErr := r.cleanup(ctx, log, cms); cleanupErr != nil && err == nil {
+		err = cleanupErr
+	}
 	return reconcile.Result{Requeue: requeue}, err
+}
+
+func (r *ConfigMapSecret) cleanup(ctx context.Context, log logr.Logger, cms *v1alpha1.ConfigMapSecret) error {
+	secretName := cms.Spec.Template.Name
+	if secretName == "" {
+		secretName = cms.Name
+	}
+
+	r.mu.Lock()
+	owned := keys(r.owned.srcs(cms.Namespace, string(cms.UID)))
+	r.mu.Unlock()
+
+	for _, name := range owned {
+		if name == secretName {
+			continue
+		}
+
+		key := types.NamespacedName{Namespace: cms.Namespace, Name: name}
+		secretLog := log.WithValues("secret", key)
+		secretLog.Info("Cleaning up secret")
+
+		secret := &corev1.Secret{}
+		if err := r.client.Get(ctx, key, secret); err != nil {
+			if apierrors.IsNotFound(err) {
+				secretLog.Info("Cleaning up secret unnecessary, already removed")
+				continue
+			}
+			secretLog.Error(err, "Cleaning up secret, get failed")
+			return err
+		}
+		if err := r.client.Delete(ctx, secret); err != nil {
+			secretLog.Error(err, "Cleaning up secret, delete failed")
+			return err
+		}
+	}
+	return nil
 }
 
 func (r *ConfigMapSecret) sync(ctx context.Context, log logr.Logger, cms *v1alpha1.ConfigMapSecret) (bool, error) {
@@ -384,6 +463,29 @@ func (r *ConfigMapSecret) syncStatus(ctx context.Context, log logr.Logger, cms *
 		return err
 	}
 	return nil
+}
+
+func getOwner(secret *corev1.Secret) *metav1.OwnerReference {
+	owner := metav1.GetControllerOf(secret)
+	if owner == nil || owner.Kind != "ConfigMapSecret" {
+		return nil
+	}
+	if gv, _ := schema.ParseGroupVersion(owner.APIVersion); gv.Group != v1alpha1.GroupVersion.Group {
+		return nil
+	}
+	return owner
+}
+
+func keys(set map[string]bool) []string {
+	n := len(set)
+	if n == 0 {
+		return nil
+	}
+	s := make([]string, 0, n)
+	for k := range set {
+		s = append(s, k)
+	}
+	return s
 }
 
 func toReqs(namespace string, names map[string]bool) []reconcile.Request {
