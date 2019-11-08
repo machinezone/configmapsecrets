@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/exec"
 	"os/user"
+	"path"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -27,15 +28,13 @@ const (
 	name = "configmapsecret-controller"
 	repo = "github.com/machinezone/configmapsecrets"
 
-	goVersion  = "1.12"
+	goVersion  = "1.13"
 	buildImage = "golang:" + goVersion + "-alpine"
 	testImage  = "kubebuilder-golang-" + goVersion + "-alpine"
 	baseImage  = "gcr.io/distroless/static:latest"
 )
 
 var arches = []string{"amd64", "arm", "arm64"}
-
-// var arches = []string{"amd64"}
 
 var trg = target{name: name, repo: repo}
 
@@ -318,6 +317,7 @@ func buildImg(arch string) error {
 	defer os.Remove(tmp.Name())
 	buf := bufio.NewWriter(tmp)
 	fmt.Fprintf(buf, "FROM %s\n", baseImage)
+	fmt.Fprintf(buf, "ADD LICENSE /LICENSE\n")
 	fmt.Fprintf(buf, "LABEL os=linux")
 	fmt.Fprintf(buf, " arch=%s", arch)
 	fmt.Fprintf(buf, " binary=%s", trg.Name())
@@ -333,6 +333,17 @@ func buildImg(arch string) error {
 		return err
 	}
 
+	ctxDir := binDir(arch)
+	curDir, err := os.Getwd()
+	if err != nil {
+		return err
+	}
+	srcLicense := path.Join(curDir, "LICENSE")
+	dstLicense := path.Join(ctxDir, "LICENSE")
+	if err := os.Link(srcLicense, dstLicense); err != nil && !os.IsExist(err) {
+		return err
+	}
+
 	tag := image(arch)
 	err = sh.Run(
 		"docker",
@@ -340,7 +351,7 @@ func buildImg(arch string) error {
 		"--platform", "linux/"+arch,
 		"-t", tag,
 		"-f", tmp.Name(), // dockerfile
-		binDir(arch), // context: just the binary
+		ctxDir, // context: just the binary
 	)
 	if err != nil {
 		return err
@@ -366,18 +377,27 @@ func Push() error {
 	var tags []string
 	for _, arch := range arches {
 		fmt.Printf("pushing image for linux/%s\n", arch)
-		tag := image(arch)
+		src := image(arch)
+		tag := archTag(arch)
+		if err := sh.Run("docker", "tag", src, tag); err != nil {
+			return err
+		}
 		if err := sh.Run("docker", "push", tag); err != nil {
 			return err
 		}
-		tags = append(tags, tag)
+		digest, err := sh.Output("docker", "inspect", "--format={{index .RepoDigests 0}}", tag)
+		if err != nil {
+			return err
+		}
+		tags = append(tags, digest)
 	}
 
 	// create and push manifest
 	fmt.Printf("pushing manifest\n")
 	env := map[string]string{"DOCKER_CLI_EXPERIMENTAL": "enabled"}
 	args := append([]string{"manifest", "create", "--amend", base}, tags...)
-	if err := sh.RunWith(env, "docker", args...); err != nil {
+	if out, err := sh.OutputWith(env, "docker", args...); err != nil {
+		fmt.Println(out)
 		return err
 	}
 	for i, arch := range arches {
@@ -395,7 +415,7 @@ func Push() error {
 			return err
 		}
 	}
-	if err := sh.RunWith(env, "docker", "manifest", "push", base); err != nil {
+	if err := sh.RunWith(env, "docker", "manifest", "push", "--purge", base); err != nil {
 		return err
 	}
 	out, err := sh.OutputWith(env, "docker", "manifest", "inspect", base)
@@ -499,7 +519,13 @@ func manifest() string {
 	return fmt.Sprintf("%s/%s:%s", trg.Registry(), trg.Name(), trg.Version())
 }
 
-func image(arch string) string { return manifest() + "__linux_" + arch }
+func archTag(arch string) string {
+	return fmt.Sprintf("%s/%s:__unstable__linux_%s", trg.Registry(), trg.Name(), arch)
+}
+
+func image(arch string) string {
+	return manifest() + "__linux_" + arch
+}
 
 func pullBuildImage() error { return pullImage(buildImage) }
 
