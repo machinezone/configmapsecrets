@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	clientscheme "k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
+	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/manager/signals"
@@ -51,11 +52,13 @@ func init() {
 
 func main() {
 	var (
+		healthAddr     string
 		metricsAddr    string
 		allNamespaces  bool
 		leaderElection bool
 	)
-	flag.StringVar(&metricsAddr, "metrics-addr", ":8080", "The address the metric endpoint binds to.")
+	flag.StringVar(&healthAddr, "health-addr", ":9090", "The address to which the health endpoint binds.")
+	flag.StringVar(&metricsAddr, "metrics-addr", ":9091", "The address to which the metric endpoint binds.")
 	flag.BoolVar(&allNamespaces, "all-namespaces", true,
 		"Enable the contoller to manage all namespaces, instead of only its own namespace.")
 	flag.BoolVar(&leaderElection, "enable-leader-election", false,
@@ -76,6 +79,7 @@ func main() {
 
 	opts := manager.Options{
 		Scheme:                  scheme,
+		HealthProbeBindAddress:  healthAddr,
 		MetricsBindAddress:      metricsAddr,
 		LeaderElection:          leaderElection,
 		LeaderElectionID:        "configmapsecret-controller-leader",
@@ -89,7 +93,8 @@ func main() {
 	}
 
 	mgr, err := manager.New(cfg, opts)
-	check(err, "Unable to start manager")
+	check(err, "Unable to create manager")
+	check(mgr.AddHealthzCheck("ping", healthz.Ping), "Unable to install healthz check")
 
 	rec := controllers.ConfigMapSecret{}
 	check(rec.SetupWithManager(mgr), "Unable to create controller")

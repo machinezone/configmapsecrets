@@ -16,18 +16,22 @@ spec:
     spec:
       containers:
         - name: controller
-          image: mzinc/configmapsecret-controller:v0.1.1
+          image: mzinc/configmapsecret-controller:v0.2.0
           imagePullPolicy: Always
           command:
             - /configmapsecret-controller
+            - --health-addr=:9090
             - --metrics-addr=:9091
             - --enable-leader-election
           ports:
+            - name: http-health
+              containerPort: 9090
             - name: http-metrics
               containerPort: 9091
           livenessProbe:
-            tcpSocket:
-              port: http-metrics
+            httpGet:
+              path: /healthz
+              port: http-health
           resources:
             limits:
               cpu: 100m
