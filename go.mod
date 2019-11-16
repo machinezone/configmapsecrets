@@ -1,37 +1,37 @@
 module github.com/machinezone/configmapsecrets
 
-go 1.12
+go 1.13
 
 require (
-	cloud.google.com/go v0.44.3 // indirect
+	cloud.google.com/go v0.48.0 // indirect
+	github.com/Azure/go-autorest/autorest v0.9.2 // indirect
+	github.com/Azure/go-autorest/autorest/adal v0.8.0 // indirect
+	github.com/cespare/xxhash/v2 v2.1.1 // indirect
 	github.com/go-logr/logr v0.1.0
 	github.com/go-logr/zapr v0.1.1
-	github.com/gogo/protobuf v1.2.2-0.20190723190241-65acae22fc9d // indirect
-	github.com/golang/groupcache v0.0.0-20190702054246-869f871628b6 // indirect
-	github.com/google/go-cmp v0.3.1 // indirect
-	github.com/google/uuid v1.1.1 // indirect
-	github.com/gophercloud/gophercloud v0.3.0 // indirect
+	github.com/gogo/protobuf v1.3.1 // indirect
+	github.com/golang/groupcache v0.0.0-20191027212112-611e8accdfc9 // indirect
+	github.com/gophercloud/gophercloud v0.6.0 // indirect
 	github.com/hashicorp/golang-lru v0.5.3 // indirect
-	github.com/imdario/mergo v0.3.7 // indirect
+	github.com/imdario/mergo v0.3.8 // indirect
 	github.com/magefile/mage v1.8.0
-	github.com/onsi/ginkgo v1.9.0 // indirect
-	github.com/onsi/gomega v1.6.0
-	github.com/prometheus/client_golang v1.1.0
-	github.com/prometheus/client_model v0.0.0-20190812154241-14fe0d1b01d4 // indirect
-	github.com/spf13/pflag v1.0.3 // indirect
-	github.com/stretchr/testify v1.4.0 // indirect
-	go.uber.org/atomic v1.4.0 // indirect
-	go.uber.org/zap v1.10.0
-	golang.org/x/crypto v0.0.0-20190820162420-60c769a6c586 // indirect
-	golang.org/x/net v0.0.0-20190813141303-74dc4d7220e7 // indirect
-	golang.org/x/sys v0.0.0-20190813064441-fde4db37ae7a // indirect
-	k8s.io/api v0.0.0-20190819141258-3544db3b9e44
-	k8s.io/apimachinery v0.0.0-20190817020851-f2f3a405f61d
-	k8s.io/client-go v11.0.1-0.20190409021438-1a26190bd76a+incompatible
-	k8s.io/klog v0.4.0 // indirect
-	k8s.io/kube-openapi v0.0.0-20190816220812-743ec37842bf // indirect
-	k8s.io/utils v0.0.0-20190809000727-6c36bc71fc4a // indirect
-	sigs.k8s.io/controller-runtime v0.2.1
+	github.com/onsi/gomega v1.7.0
+	github.com/prometheus/client_golang v1.2.1
+	github.com/prometheus/procfs v0.0.7 // indirect
+	go.uber.org/multierr v1.4.0 // indirect
+	go.uber.org/zap v1.13.0
+	golang.org/x/crypto v0.0.0-20191112222119-e1110fd1c708 // indirect
+	golang.org/x/net v0.0.0-20191112182307-2180aed22343 // indirect
+	golang.org/x/sys v0.0.0-20191115151921-52ab43148777 // indirect
+	golang.org/x/time v0.0.0-20191024005414-555d28b269f0 // indirect
+	golang.org/x/tools v0.0.0-20191115202509-3a792d9c32b2 // indirect
+	golang.org/x/xerrors v0.0.0-20191011141410-1b5146add898 // indirect
+	google.golang.org/appengine v1.6.5 // indirect
+	gopkg.in/yaml.v2 v2.2.5 // indirect
+	k8s.io/api v0.0.0-20191115135540-bbc9463b57e5
+	k8s.io/apiextensions-apiserver v0.0.0-20191115221207-fc2e07a66c64 // indirect
+	k8s.io/apimachinery v0.0.0-20191115015347-3c7067801da2
+	k8s.io/client-go v0.0.0-20191115215802-0a8a1d7b7fae
+	k8s.io/utils v0.0.0-20191114200735-6ca3b61696b6 // indirect
+	sigs.k8s.io/controller-runtime v0.4.0
 )
-
-replace k8s.io/client-go => k8s.io/client-go v0.0.0-20190819141724-e14f31a72a77
