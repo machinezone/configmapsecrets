@@ -155,8 +155,8 @@ func (r *ConfigMapSecret) setRefs(namespace, name string, secrets, configMaps ma
 
 // +kubebuilder:rbac:groups=core,resources=configmaps,verbs=get;list;watch
 // +kubebuilder:rbac:groups=core,resources=secrets,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=secrets.k8s.mz.com,resources=configmapsecrets,verbs=get;list;watch;update;patch;delete
-// +kubebuilder:rbac:groups=secrets.k8s.mz.com,resources=configmapsecrets/status;configmapsecrets/finalizers,verbs=get;update;patch
+// +kubebuilder:rbac:groups=secrets.mz.com,resources=configmapsecrets,verbs=get;list;watch;update;patch;delete
+// +kubebuilder:rbac:groups=secrets.mz.com,resources=configmapsecrets/status;configmapsecrets/finalizers,verbs=get;update;patch
 
 // Reconcile reconciles the state of the cluster with the desired state of a
 // ConfigMapSecret.

@@ -6,9 +6,9 @@ metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.2.4
   creationTimestamp: null
-  name: configmapsecrets.secrets.k8s.mz.com
+  name: configmapsecrets.secrets.mz.com
 spec:
-  group: secrets.k8s.mz.com
+  group: secrets.mz.com
   names:
     kind: ConfigMapSecret
     listKind: ConfigMapSecretList

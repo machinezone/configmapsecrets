@@ -29,7 +29,7 @@ kubectl apply -f manifest/*.yaml
 
 ### Input
 ```yaml
-apiVersion: secrets.k8s.mz.com/v1alpha1
+apiVersion: secrets.mz.com/v1alpha1
 kind: ConfigMapSecret
 metadata:
   name: alertmanager-config
