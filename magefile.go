@@ -16,6 +16,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/machinezone/configmapsecrets/pkg/genapi"
@@ -28,7 +29,7 @@ const (
 	name = "configmapsecret-controller"
 	repo = "github.com/machinezone/configmapsecrets"
 
-	goVersion  = "1.13"
+	goVersion  = "1.14"
 	buildImage = "golang:" + goVersion + "-alpine"
 	testImage  = "kubebuilder-golang-" + goVersion + "-alpine"
 	baseImage  = "gcr.io/distroless/static:latest"
@@ -97,22 +98,21 @@ func Version() error {
 
 // Launches an interactive shell in a containerized test environment.
 func Shell() error {
-	mg.Deps(buildTestImg)
+	mg.Deps(buildTestImg, mkBuildDirs)
 
-	u, err := user.Current()
-	if err != nil {
-		return err
-	}
 	pwd, err := os.Getwd()
 	if err != nil {
 		return err
 	}
-	cmd := exec.Command(
-		"docker",
+	args, err := withUserArgs(
 		"run",
 		"-ti",
 		"--rm",
-		"-u", u.Uid+":"+u.Gid,
+	)
+	if err != nil {
+		return err
+	}
+	args = append(args,
 		"-w", "/src",
 		"-v", pwd+":/src",
 		"-v", cachePath("bin")+":/go/bin",
@@ -125,6 +125,7 @@ func Shell() error {
 		testImage,
 		"/bin/sh",
 	)
+	cmd := exec.Command("docker", args...)
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
@@ -137,22 +138,21 @@ func Test() error {
 	if ok, err := shouldDo(testPath); !ok {
 		return err
 	}
-	mg.Deps(buildTestImg)
+	mg.Deps(buildTestImg, mkBuildDirs)
 
-	u, err := user.Current()
-	if err != nil {
-		return err
-	}
 	pwd, err := os.Getwd()
 	if err != nil {
 		return err
 	}
-	err = sh.RunV(
-		"docker",
+	args, err := withUserArgs(
 		"run",
 		"-i",
 		"--rm",
-		"-u", u.Uid+":"+u.Gid,
+	)
+	if err != nil {
+		return err
+	}
+	args = append(args,
 		"-w", "/src",
 		"-v", pwd+":/src",
 		"-v", cachePath("bin")+":/go/bin",
@@ -165,10 +165,20 @@ func Test() error {
 		testImage,
 		"/bin/sh", "-c", "/src/hack/test.sh cmd pkg",
 	)
-	if err != nil {
+	if err := sh.RunV("docker", args...); err != nil {
 		return err
 	}
 	return touchFile(testPath)
+}
+
+func mkBuildDirs() error {
+	if err := mkDir(cachePath("bin")); err != nil {
+		return err
+	}
+	if err := mkDir(cachePath("cache")); err != nil {
+		return err
+	}
+	return nil
 }
 
 func buildTestImg() error {
@@ -214,7 +224,7 @@ func Bins() error {
 		return err
 	}
 	fmt.Printf("building %s binaries in %s\n", trg.Name(), buildImage)
-	mg.Deps(pullBuildImage)
+	mg.Deps(pullBuildImage, mkBuildDirs)
 
 	now := time.Now()
 	cmds := []string{
@@ -241,21 +251,19 @@ func Bins() error {
 			),
 		)
 	}
-	u, err := user.Current()
-	if err != nil {
-		return err
-	}
 	pwd, err := os.Getwd()
 	if err != nil {
 		return err
 	}
-	env := map[string]string{"$": "$"} // Escape hack: "$$LDFLAGS" becomes "$LDFLAGS"
-	_, err = sh.Exec(env, os.Stdout, os.Stderr,
-		"docker",
+	args, err := withUserArgs(
 		"run",
 		"-i",
 		"--rm",
-		"-u", u.Uid+":"+u.Gid,
+	)
+	if err != nil {
+		return err
+	}
+	args = append(args,
 		"-w", "/src",
 		"-v", pwd+":/src",
 		"-v", cachePath("bin")+":/go/bin",
@@ -269,7 +277,8 @@ func Bins() error {
 		buildImage,
 		"/bin/sh", "-c", strings.Join(cmds, " && "),
 	)
-	if err != nil {
+	env := map[string]string{"$": "$"} // Escape hack: "$$LDFLAGS" becomes "$LDFLAGS"
+	if _, err := sh.Exec(env, os.Stdout, os.Stderr, "docker", args...); err != nil {
 		return err
 	}
 	for _, arch := range arches {
@@ -695,4 +704,48 @@ func mkDir(path string) error {
 func rmDir(path string) error {
 	log.Printf("removing directory: %s", path)
 	return os.RemoveAll(path)
+}
+
+func withUserArgs(args ...string) ([]string, error) {
+	u, err := user.Current()
+	if err != nil {
+		return nil, err
+	}
+	if !isPodman() {
+		return append(args, "-u", u.Uid+":"+u.Gid), nil
+	}
+	uid, err := strconv.Atoi(u.Uid)
+	if err != nil {
+		return nil, err
+	}
+	gid, err := strconv.Atoi(u.Gid)
+	if err != nil {
+		return nil, err
+	}
+	const maxIDs = 1 << 16
+	return append(args,
+		"-u", fmt.Sprintf("%d:%d", uid, gid),
+		"--uidmap", fmt.Sprintf("%d:0:1", uid),
+		"--uidmap", fmt.Sprintf("0:1:%d", uid),
+		"--uidmap", fmt.Sprintf("%d:%d:%d", uid+1, uid+1, maxIDs-uid),
+		"--gidmap", fmt.Sprintf("%d:0:1", gid),
+		"--gidmap", fmt.Sprintf("0:1:%d", gid),
+		"--gidmap", fmt.Sprintf("%d:%d:%d", gid+1, gid+1, maxIDs-gid),
+	), nil
+}
+
+var podman struct {
+	init sync.Once
+	v    bool
+}
+
+func isPodman() bool {
+	podman.init.Do(func() {
+		out, err := sh.Output("docker", "--help")
+		if err != nil {
+			return
+		}
+		podman.v = strings.Contains(out, "podman")
+	})
+	return podman.v
 }
