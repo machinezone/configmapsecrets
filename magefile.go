@@ -453,11 +453,11 @@ func generateCDRs() error {
 }
 
 func generateRBAC() error {
-	out, err := sh.Output("controller-gen", "rbac:roleName=configmapsecret-controller", "paths=./pkg/...", "output:stdout")
+	out, err := sh.Output("controller-gen", "rbac:roleName=configmapsecret-controller", "paths=./cmd/...;./pkg/...", "output:stdout")
 	if err != nil {
 		return err
 	}
-	return writeFile("manifest/clusterrole.yaml", out)
+	return writeFile("manifest/roles.yaml", out)
 }
 
 func generateDocs() error {

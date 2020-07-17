@@ -50,6 +50,14 @@ func init() {
 	// +kubebuilder:scaffold:scheme
 }
 
+// RBAC for leader election, scoped to the namespace used by default manifests (kube-system).
+//
+// N.B.: RBAC cannot use resourceNames with "list", "watch", "create", or "deletecollection" verbs.
+//
+// +kubebuilder:rbac:namespace=kube-system,groups=core,resources=configmaps,verbs=create
+// +kubebuilder:rbac:namespace=kube-system,groups=core,resources=configmaps,verbs=get;update,resourceNames=configmapsecret-controller-leader
+// +kubebuilder:rbac:namespace=kube-system,groups=core,resources=events,verbs=create;patch
+
 func main() {
 	var (
 		healthAddr     string
