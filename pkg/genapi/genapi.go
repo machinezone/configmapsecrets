@@ -194,9 +194,25 @@ func ParsePackage(path string) (*Package, error) {
 		Constants: make(map[string]Constant),
 		Structs:   make(map[string]Struct),
 	}
+	// Constants are not necessarily associated with their type.
+	// They may be associated with another type or the package.
+	scope := pkg.Types.Scope()
+	consts := constValues(scope, p.DocPkg.Consts)
+	for _, typ := range p.DocPkg.Types {
+		if len(typ.Consts) == 0 {
+			continue
+		}
+		for typName, vals := range constValues(scope, typ.Consts) {
+			consts[typName] = append(consts[typName], vals...)
+		}
+	}
 	for _, dt := range p.DocPkg.Types {
-		if len(dt.Consts) > 0 {
-			p.Constants[dt.Name] = newConstant(pkg.Types, dt)
+		if vals, ok := consts[scope.Lookup(dt.Name).Type()]; ok {
+			p.Constants[dt.Name] = Constant{
+				Doc:    fmtRawDoc(dt.Doc),
+				Name:   dt.Name,
+				Values: vals,
+			}
 		} else if st, ok := dt.Decl.Specs[0].(*ast.TypeSpec).Type.(*ast.StructType); ok {
 			p.Structs[dt.Name] = newStruct(dt, st)
 		}
@@ -215,12 +231,16 @@ type Constant struct {
 	Values []Value
 }
 
-func newConstant(pkg *types.Package, dt *doc.Type) Constant {
-	c := Constant{
-		Name: dt.Name,
-		Doc:  fmtRawDoc(dt.Doc),
-	}
-	for _, v := range dt.Consts {
+// A Value represents a constant value.
+type Value struct {
+	Doc   string
+	Name  string
+	Value constant.Value
+}
+
+func constValues(scope *types.Scope, consts []*doc.Value) map[types.Type][]Value {
+	cvs := make(map[types.Type][]Value)
+	for _, v := range consts {
 		docWrap := fmtRawDoc(v.Doc)
 		for _, s := range v.Decl.Specs {
 			spec, ok := s.(*ast.ValueSpec)
@@ -232,22 +252,17 @@ func newConstant(pkg *types.Package, dt *doc.Type) Constant {
 				doc = docWrap
 			}
 			for _, n := range spec.Names {
-				c.Values = append(c.Values, Value{
+				obj := scope.Lookup(n.Name)
+				typ := obj.Type()
+				cvs[typ] = append(cvs[typ], Value{
 					Doc:   doc,
 					Name:  n.Name,
-					Value: pkg.Scope().Lookup(n.Name).(*types.Const).Val(),
+					Value: obj.(*types.Const).Val(),
 				})
 			}
 		}
 	}
-	return c
-}
-
-// A Value represents a constant value.
-type Value struct {
-	Doc   string
-	Name  string
-	Value constant.Value
+	return cvs
 }
 
 // A Struct represents a struct.
