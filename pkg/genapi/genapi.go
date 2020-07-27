@@ -102,8 +102,8 @@ func mdType(pkg *Package, typ ast.Expr) string {
 		typID := e.Sel.Name
 		text := pkgID + "." + typID
 		if path, ok := importPath(pkg, typ, pkgID); ok {
-			// https://godoc.org/k8s.io/apimachinery/pkg/apis/meta/v1#ObjectMeta
-			return fmt.Sprintf("[%s](https://godoc.org/%s#%s)", text, path, typID)
+			// https://pkg.go.dev/k8s.io/apimachinery/pkg/apis/meta/v1#ObjectMeta
+			return fmt.Sprintf("[%s](https://pkg.go.dev/%s#%s)", text, path, typID)
 		}
 		return text
 	case *ast.StarExpr:

@@ -17,7 +17,7 @@ ConfigMapSecret holds configuration data with embedded secrets.
 
 | Field | Description | Type | Required |
 | ----- | ----------- | ---- | -------- |
-| metadata | Standard object metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata | [metav1.ObjectMeta](https://godoc.org/k8s.io/apimachinery/pkg/apis/meta/v1#ObjectMeta) | false |
+| metadata | Standard object metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata | [metav1.ObjectMeta](https://pkg.go.dev/k8s.io/apimachinery/pkg/apis/meta/v1#ObjectMeta) | false |
 | spec | Desired state of the ConfigMapSecret. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status | [ConfigMapSecretSpec](#configmapsecretspec) | false |
 | status | Observed state of the ConfigMapSecret. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status | [ConfigMapSecretStatus](#configmapsecretstatus) | false |
 
@@ -30,9 +30,9 @@ ConfigMapSecretCondition describes the state of a ConfigMapSecret.
 | Field | Description | Type | Required |
 | ----- | ----------- | ---- | -------- |
 | type | Type of the condition. | [ConfigMapSecretConditionType](#configmapsecretconditiontype) | true |
-| status | Status of the condition: True, False, or Unknown. | [corev1.ConditionStatus](https://godoc.org/k8s.io/api/core/v1#ConditionStatus) | true |
-| lastUpdateTime | The last time the condition was updated. | [metav1.Time](https://godoc.org/k8s.io/apimachinery/pkg/apis/meta/v1#Time) | false |
-| lastTransitionTime | Last time the condition transitioned from one status to another. | [metav1.Time](https://godoc.org/k8s.io/apimachinery/pkg/apis/meta/v1#Time) | false |
+| status | Status of the condition: True, False, or Unknown. | [corev1.ConditionStatus](https://pkg.go.dev/k8s.io/api/core/v1#ConditionStatus) | true |
+| lastUpdateTime | The last time the condition was updated. | [metav1.Time](https://pkg.go.dev/k8s.io/apimachinery/pkg/apis/meta/v1#Time) | false |
+| lastTransitionTime | Last time the condition transitioned from one status to another. | [metav1.Time](https://pkg.go.dev/k8s.io/apimachinery/pkg/apis/meta/v1#Time) | false |
 | reason | The reason for the last update. | string | false |
 | message | A human readable message indicating details about the last update. | string | false |
 
@@ -54,7 +54,7 @@ ConfigMapSecretList contains a list of ConfigMapSecrets.
 
 | Field | Description | Type | Required |
 | ----- | ----------- | ---- | -------- |
-| metadata | Standard list metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#lists-and-simple-kinds | [metav1.ListMeta](https://godoc.org/k8s.io/apimachinery/pkg/apis/meta/v1#ListMeta) | false |
+| metadata | Standard list metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#lists-and-simple-kinds | [metav1.ListMeta](https://pkg.go.dev/k8s.io/apimachinery/pkg/apis/meta/v1#ListMeta) | false |
 | items | List of ConfigMapSecrets. | [][ConfigMapSecret](#configmapsecret) | true |
 
 [Back to TOC](#table-of-contents)
@@ -87,7 +87,7 @@ ConfigMapTemplate is a ConfigMap template.
 
 | Field | Description | Type | Required |
 | ----- | ----------- | ---- | -------- |
-| metadata | Standard object metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata | [metav1.ObjectMeta](https://godoc.org/k8s.io/apimachinery/pkg/apis/meta/v1#ObjectMeta) | false |
+| metadata | Standard object metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata | [metav1.ObjectMeta](https://pkg.go.dev/k8s.io/apimachinery/pkg/apis/meta/v1#ObjectMeta) | false |
 | data | Data contains the configuration data. Each key must consist of alphanumeric characters, '-', '_' or '.'. Values with non-UTF-8 byte sequences must use the BinaryData field. The keys stored in Data must not overlap with the keys in the BinaryData field. | map[string]string | false |
 | binaryData | BinaryData contains the binary data. Each key must consist of alphanumeric characters, '-', '_' or '.'. BinaryData can contain byte sequences that are not in the UTF-8 range. The keys stored in BinaryData must not overlap with the keys in the Data field. | map[string][]byte | false |
 
@@ -101,7 +101,7 @@ TemplateVariable is a template variable.
 | ----- | ----------- | ---- | -------- |
 | name | Name of the template variable. | string | true |
 | value | Variable references $(VAR_NAME) are expanded using the previous defined environment variables in the ConfigMapSecret. If a variable cannot be resolved, the reference in the input string will be unchanged. The $(VAR_NAME) syntax can be escaped with a double $$, ie: $$(VAR_NAME). Escaped references will never be expanded, regardless of whether the variable exists or not. Defaults to \"\". | string | false |
-| secretValue | SecretValue selects a value by its key in a Secret. | *[corev1.SecretKeySelector](https://godoc.org/k8s.io/api/core/v1#SecretKeySelector) | false |
-| configMapValue | ConfigMapValue selects a value by its key in a ConfigMap. | *[corev1.ConfigMapKeySelector](https://godoc.org/k8s.io/api/core/v1#ConfigMapKeySelector) | false |
+| secretValue | SecretValue selects a value by its key in a Secret. | *[corev1.SecretKeySelector](https://pkg.go.dev/k8s.io/api/core/v1#SecretKeySelector) | false |
+| configMapValue | ConfigMapValue selects a value by its key in a ConfigMap. | *[corev1.ConfigMapKeySelector](https://pkg.go.dev/k8s.io/api/core/v1#ConfigMapKeySelector) | false |
 
 [Back to TOC](#table-of-contents)
