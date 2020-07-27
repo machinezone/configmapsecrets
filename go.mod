@@ -19,7 +19,7 @@ require (
 	golang.org/x/net v0.0.0-20200707034311-ab3426394381 // indirect
 	golang.org/x/sys v0.0.0-20200501145240-bc7a7d42d5c3 // indirect
 	golang.org/x/time v0.0.0-20200416051211-89c76fbcd5d1 // indirect
-	golang.org/x/tools v0.0.0-20200501155019-2658dc0cadb5 // indirect
+	golang.org/x/tools v0.0.0-20200727154626-eaaaedc6afa7
 	gomodules.xyz/jsonpatch/v2 v2.1.0 // indirect
 	google.golang.org/appengine v1.6.6 // indirect
 	k8s.io/api v0.18.6

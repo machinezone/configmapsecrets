@@ -461,7 +461,7 @@ func generateRBAC() error {
 }
 
 func generateDocs() error {
-	pkg, err := genapi.ParseDir("pkg/api/v1alpha1")
+	pkg, err := genapi.ParsePackage("github.com/machinezone/configmapsecrets/pkg/api/v1alpha1")
 	if err != nil {
 		return err
 	}

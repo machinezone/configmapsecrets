@@ -4,6 +4,7 @@
 ## Table of Contents
 * [ConfigMapSecret](#configmapsecret)
 * [ConfigMapSecretCondition](#configmapsecretcondition)
+* [ConfigMapSecretConditionType](#configmapsecretconditiontype)
 * [ConfigMapSecretList](#configmapsecretlist)
 * [ConfigMapSecretSpec](#configmapsecretspec)
 * [ConfigMapSecretStatus](#configmapsecretstatus)
@@ -28,12 +29,22 @@ ConfigMapSecretCondition describes the state of a ConfigMapSecret.
 
 | Field | Description | Type | Required |
 | ----- | ----------- | ---- | -------- |
-| type | Type of the condition. | ConfigMapSecretConditionType | true |
+| type | Type of the condition. | [ConfigMapSecretConditionType](#configmapsecretconditiontype) | true |
 | status | Status of the condition: True, False, or Unknown. | [corev1.ConditionStatus](https://godoc.org/k8s.io/api/core/v1#ConditionStatus) | true |
 | lastUpdateTime | The last time the condition was updated. | [metav1.Time](https://godoc.org/k8s.io/apimachinery/pkg/apis/meta/v1#Time) | false |
 | lastTransitionTime | Last time the condition transitioned from one status to another. | [metav1.Time](https://godoc.org/k8s.io/apimachinery/pkg/apis/meta/v1#Time) | false |
 | reason | The reason for the last update. | string | false |
 | message | A human readable message indicating details about the last update. | string | false |
+
+[Back to TOC](#table-of-contents)
+
+## ConfigMapSecretConditionType
+
+ConfigMapSecretConditionType is a valid value for ConfigMapSecretCondition.Type
+
+| Name | Value | Description |
+| ---- | ----- | ----------- |
+| ConfigMapSecretRenderFailure | RenderFailure | ConfigMapSecretRenderFailure means that the target secret could not be rendered. |
 
 [Back to TOC](#table-of-contents)
 

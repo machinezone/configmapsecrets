@@ -12,9 +12,10 @@ import (
 	"bytes"
 	"fmt"
 	"go/ast"
+	"go/constant"
 	"go/doc"
-	"go/parser"
 	"go/token"
+	"go/types"
 	"io"
 	"os"
 	"path"
@@ -22,6 +23,8 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+
+	"golang.org/x/tools/go/packages"
 )
 
 // WriteMarkdown writes the API of pkg as markdown to w.
@@ -29,7 +32,7 @@ func WriteMarkdown(w io.Writer, pkg *Package) error {
 	b := bufio.NewWriter(w)
 	printHeader(b)
 	printTOC(b, pkg)
-	printStructs(b, pkg)
+	printTypes(b, pkg)
 	return b.Flush()
 }
 
@@ -41,23 +44,41 @@ func printHeader(w io.Writer) {
 
 func printTOC(w io.Writer, pkg *Package) {
 	fmt.Fprintf(w, "\n## Table of Contents\n")
-	for _, s := range sortedStructs(pkg.Structs) {
-		fmt.Fprintf(w, "* %s\n", mdSectionLink(s.Name))
+	for _, name := range sortedNames(pkg) {
+		fmt.Fprintf(w, "* %s\n", mdSectionLink(name))
 	}
 }
 
-func printStructs(w io.Writer, pkg *Package) {
-	for _, s := range sortedStructs(pkg.Structs) {
-		fmt.Fprintf(w, "\n## %s\n\n%s\n\n", s.Name, s.Doc)
-
-		fmt.Fprintln(w, "| Field | Description | Type | Required |")
-		fmt.Fprintln(w, "| ----- | ----------- | ---- | -------- |")
-		for _, f := range s.Fields {
-			fmt.Fprintln(w, "|", f.Name, "|", f.Doc, "|", mdType(pkg, f.Type), "|", f.Required, "|")
+func printTypes(w io.Writer, pkg *Package) {
+	for _, name := range sortedNames(pkg) {
+		if s, ok := pkg.Structs[name]; ok {
+			printStruct(w, pkg, s)
+		} else {
+			printConst(w, pkg, pkg.Constants[name])
 		}
-		fmt.Fprintln(w, "")
-		fmt.Fprintln(w, "[Back to TOC](#table-of-contents)")
 	}
+}
+
+func printStruct(w io.Writer, pkg *Package, s Struct) {
+	fmt.Fprintf(w, "\n## %s\n\n%s\n\n", s.Name, s.Doc)
+	fmt.Fprintln(w, "| Field | Description | Type | Required |")
+	fmt.Fprintln(w, "| ----- | ----------- | ---- | -------- |")
+	for _, f := range s.Fields {
+		fmt.Fprintln(w, "|", f.Name, "|", f.Doc, "|", mdType(pkg, f.Type), "|", f.Required, "|")
+	}
+	fmt.Fprintln(w, "")
+	fmt.Fprintln(w, "[Back to TOC](#table-of-contents)")
+}
+
+func printConst(w io.Writer, pkg *Package, c Constant) {
+	fmt.Fprintf(w, "\n## %s\n\n%s\n\n", c.Name, c.Doc)
+	fmt.Fprintln(w, "| Name | Value | Description |")
+	fmt.Fprintln(w, "| ---- | ----- | ----------- |")
+	for _, v := range c.Values {
+		fmt.Fprintln(w, "|", v.Name, "|", constant.Val(v.Value), "|", v.Doc, "|")
+	}
+	fmt.Fprintln(w, "")
+	fmt.Fprintln(w, "[Back to TOC](#table-of-contents)")
 }
 
 func mdSectionLink(name string) string {
@@ -69,10 +90,13 @@ func mdSectionLink(name string) string {
 func mdType(pkg *Package, typ ast.Expr) string {
 	switch e := typ.(type) {
 	case *ast.Ident:
-		if _, ok := pkg.Structs[e.Name]; !ok {
-			return e.Name
+		if _, ok := pkg.Structs[e.Name]; ok {
+			return mdSectionLink(e.Name)
 		}
-		return mdSectionLink(e.Name)
+		if _, ok := pkg.Constants[e.Name]; ok {
+			return mdSectionLink(e.Name)
+		}
+		return e.Name
 	case *ast.SelectorExpr:
 		pkgID := e.X.(*ast.Ident).String()
 		typID := e.Sel.Name
@@ -93,13 +117,16 @@ func mdType(pkg *Package, typ ast.Expr) string {
 	}
 }
 
-func sortedStructs(set map[string]Struct) []Struct {
-	var s []Struct
-	for _, v := range set {
-		s = append(s, v)
+func sortedNames(pkg *Package) []string {
+	var names []string
+	for name := range pkg.Structs {
+		names = append(names, name)
 	}
-	sort.Slice(s, func(i int, k int) bool { return s[i].Name < s[k].Name })
-	return s
+	for name := range pkg.Constants {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	return names
 }
 
 func importPath(pkg *Package, exp ast.Expr, pkgID string) (string, bool) {
@@ -121,40 +148,106 @@ func importPath(pkg *Package, exp ast.Expr, pkgID string) (string, bool) {
 
 // A Package represents a package.
 type Package struct {
-	FileSet *token.FileSet
+	Pkg     *packages.Package
 	AstPkg  *ast.Package
 	DocPkg  *doc.Package
+	FileSet *token.FileSet
 
-	Structs map[string]Struct
+	Constants map[string]Constant
+	Structs   map[string]Struct
 }
 
-// ParseDir parses the package in the given path.
-func ParseDir(path string) (*Package, error) {
-	fset := token.NewFileSet()
-	pkgs, err := parser.ParseDir(fset, path, ignoreTests, parser.ParseComments)
+// ParsePackage parses the package in the given path.
+func ParsePackage(path string) (*Package, error) {
+	cfg := &packages.Config{
+		Mode: packages.NeedSyntax | packages.NeedTypes | packages.NeedDeps | packages.NeedImports, // | packages.NeedTypesInfo,
+		Fset: token.NewFileSet(),
+	}
+	pkgs, err := packages.Load(cfg, path)
 	if err != nil {
 		return nil, err
 	}
 	if len(pkgs) != 1 {
 		return nil, fmt.Errorf("expected 1 package, found %d", len(pkgs))
 	}
-	pkg := &Package{FileSet: fset}
-	for _, pkgAst := range pkgs {
-		pkg.AstPkg = pkgAst
-		pkg.DocPkg = doc.New(pkgAst, "", 0)
+	if len(pkgs[0].Errors) > 0 {
+		return nil, pkgs[0].Errors[0]
 	}
-	pkg.Structs = make(map[string]Struct)
-	for _, dt := range pkg.DocPkg.Types {
-		if st, ok := dt.Decl.Specs[0].(*ast.TypeSpec).Type.(*ast.StructType); ok {
-			s := newStruct(dt, st)
-			pkg.Structs[s.Name] = s
+	pkg := pkgs[0]
+	astPkg := &ast.Package{
+		Name:  path,
+		Files: make(map[string]*ast.File),
+		Scope: ast.NewScope(nil),
+	}
+	for _, file := range pkg.Syntax {
+		name := pkg.Fset.File(file.Package).Name()
+		astPkg.Files[name] = file
+		for _, obj := range file.Scope.Objects {
+			astPkg.Scope.Insert(obj)
 		}
 	}
-	return pkg, nil
+	p := &Package{
+		FileSet:   cfg.Fset,
+		Pkg:       pkg,
+		AstPkg:    astPkg,
+		DocPkg:    doc.New(astPkg, "", 0),
+		Constants: make(map[string]Constant),
+		Structs:   make(map[string]Struct),
+	}
+	for _, dt := range p.DocPkg.Types {
+		if len(dt.Consts) > 0 {
+			p.Constants[dt.Name] = newConstant(pkg.Types, dt)
+		} else if st, ok := dt.Decl.Specs[0].(*ast.TypeSpec).Type.(*ast.StructType); ok {
+			p.Structs[dt.Name] = newStruct(dt, st)
+		}
+	}
+	return p, nil
 }
 
 func ignoreTests(f os.FileInfo) bool {
 	return !strings.HasSuffix("_test.go", f.Name())
+}
+
+// A Constant represents a constant.
+type Constant struct {
+	Name   string
+	Doc    string
+	Values []Value
+}
+
+func newConstant(pkg *types.Package, dt *doc.Type) Constant {
+	c := Constant{
+		Name: dt.Name,
+		Doc:  fmtRawDoc(dt.Doc),
+	}
+	for _, v := range dt.Consts {
+		docWrap := fmtRawDoc(v.Doc)
+		for _, s := range v.Decl.Specs {
+			spec, ok := s.(*ast.ValueSpec)
+			if !ok {
+				continue
+			}
+			doc := fmtRawDoc(spec.Doc.Text())
+			if doc == "" {
+				doc = docWrap
+			}
+			for _, n := range spec.Names {
+				c.Values = append(c.Values, Value{
+					Doc:   doc,
+					Name:  n.Name,
+					Value: pkg.Scope().Lookup(n.Name).(*types.Const).Val(),
+				})
+			}
+		}
+	}
+	return c
+}
+
+// A Value represents a constant value.
+type Value struct {
+	Doc   string
+	Name  string
+	Value constant.Value
 }
 
 // A Struct represents a struct.
