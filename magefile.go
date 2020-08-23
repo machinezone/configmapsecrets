@@ -29,7 +29,7 @@ const (
 	name = "configmapsecret-controller"
 	repo = "github.com/machinezone/configmapsecrets"
 
-	goVersion  = "1.14"
+	goVersion  = "1.15"
 	buildImage = "golang:" + goVersion + "-alpine"
 	testImage  = "kubebuilder-golang-" + goVersion + "-alpine"
 	baseImage  = "gcr.io/distroless/static:latest"
