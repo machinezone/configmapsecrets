@@ -65,10 +65,11 @@ type ConfigMapSecretSpec struct {
 
 // ConfigMapTemplate is a ConfigMap template.
 type ConfigMapTemplate struct {
-	// Standard object metadata.
-	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
+	// Metadata is a stripped down version of the standard object metadata.
+	// Its properties will be applied to the metadata of the generated Secret.
+	// If no name is provided, the name of the ConfigMapSecret will be used.
 	// +optional
-	metav1.ObjectMeta `json:"metadata,omitempty"`
+	Metadata TemplateMetadata `json:"metadata,omitempty"`
 
 	// Data contains the configuration data.
 	// Each key must consist of alphanumeric characters, '-', '_' or '.'.
@@ -85,6 +86,31 @@ type ConfigMapTemplate struct {
 	// the Data field.
 	// +optional
 	BinaryData map[string][]byte `json:"binaryData,omitempty"`
+}
+
+// TemplateMetadata is a stripped down version of the standard object metadata.
+type TemplateMetadata struct {
+	// Name must be unique within a namespace. Is required when creating resources, although
+	// some resources may allow a client to request the generation of an appropriate name
+	// automatically. Name is primarily intended for creation idempotence and configuration
+	// definition.
+	// More info: http://kubernetes.io/docs/user-guide/identifiers#names
+	// +optional
+	Name string `json:"name,omitempty"`
+
+	// Map of string keys and values that can be used to organize and categorize
+	// (scope and select) objects. May match selectors of replication controllers
+	// and services.
+	// More info: http://kubernetes.io/docs/user-guide/labels
+	// +optional
+	Labels map[string]string `json:"labels,omitempty"`
+
+	// Annotations is an unstructured key value map stored with a resource that may be
+	// set by external tools to store and retrieve arbitrary metadata. They are not
+	// queryable and should be preserved when modifying objects.
+	// More info: http://kubernetes.io/docs/user-guide/annotations
+	// +optional
+	Annotations map[string]string `json:"annotations,omitempty"`
 }
 
 // TemplateVariable is a template variable.
@@ -115,9 +141,11 @@ type ConfigMapSecretStatus struct {
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 
 	// Represents the latest available observations of a ConfigMapSecret's current state.
-	// +patchMergeKey=type
-	// +patchStrategy=merge
-	Conditions []ConfigMapSecretCondition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type"`
+	// +listType=map
+	// +listMapKey=type
+	// +listMapKeys=type
+	// +optional
+	Conditions []ConfigMapSecretCondition `json:"conditions,omitempty"`
 }
 
 // ConfigMapSecretCondition describes the state of a ConfigMapSecret.

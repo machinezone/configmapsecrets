@@ -189,7 +189,7 @@ func (r *ConfigMapSecret) Reconcile(req reconcile.Request) (reconcile.Result, er
 }
 
 func (r *ConfigMapSecret) cleanup(ctx context.Context, log logr.Logger, cms *v1alpha1.ConfigMapSecret) error {
-	secretName := cms.Spec.Template.Name
+	secretName := cms.Spec.Template.Metadata.Name
 	if secretName == "" {
 		secretName = cms.Name
 	}
@@ -331,7 +331,8 @@ func (r *ConfigMapSecret) renderSecret(ctx context.Context, cms *v1alpha1.Config
 		data[k] = []byte(expansion.Expand(string(v), varMapFn))
 	}
 
-	name := cms.Spec.Template.Name
+	meta := cms.Spec.Template.Metadata
+	name := meta.Name
 	if name == "" {
 		name = cms.Name
 	}
@@ -339,8 +340,8 @@ func (r *ConfigMapSecret) renderSecret(ctx context.Context, cms *v1alpha1.Config
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        name,
 			Namespace:   cms.Namespace,
-			Labels:      cms.Spec.Template.Labels,
-			Annotations: cms.Spec.Template.Annotations,
+			Labels:      meta.Labels,
+			Annotations: meta.Annotations,
 		},
 		Data: data,
 		Type: corev1.SecretTypeOpaque,

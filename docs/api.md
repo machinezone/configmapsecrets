@@ -9,6 +9,7 @@
 * [ConfigMapSecretSpec](#configmapsecretspec)
 * [ConfigMapSecretStatus](#configmapsecretstatus)
 * [ConfigMapTemplate](#configmaptemplate)
+* [TemplateMetadata](#templatemetadata)
 * [TemplateVariable](#templatevariable)
 
 ## ConfigMapSecret
@@ -87,9 +88,21 @@ ConfigMapTemplate is a ConfigMap template.
 
 | Field | Description | Type | Required |
 | ----- | ----------- | ---- | -------- |
-| metadata | Standard object metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata | [metav1.ObjectMeta](https://pkg.go.dev/k8s.io/apimachinery/pkg/apis/meta/v1#ObjectMeta) | false |
+| metadata | Metadata is a stripped down version of the standard object metadata. Its properties will be applied to the metadata of the generated Secret. If no name is provided, the name of the ConfigMapSecret will be used. | [TemplateMetadata](#templatemetadata) | false |
 | data | Data contains the configuration data. Each key must consist of alphanumeric characters, '-', '_' or '.'. Values with non-UTF-8 byte sequences must use the BinaryData field. The keys stored in Data must not overlap with the keys in the BinaryData field. | map[string]string | false |
 | binaryData | BinaryData contains the binary data. Each key must consist of alphanumeric characters, '-', '_' or '.'. BinaryData can contain byte sequences that are not in the UTF-8 range. The keys stored in BinaryData must not overlap with the keys in the Data field. | map[string][]byte | false |
+
+[Back to TOC](#table-of-contents)
+
+## TemplateMetadata
+
+TemplateMetadata is a stripped down version of the standard object metadata.
+
+| Field | Description | Type | Required |
+| ----- | ----------- | ---- | -------- |
+| name | Name must be unique within a namespace. Is required when creating resources, although some resources may allow a client to request the generation of an appropriate name automatically. Name is primarily intended for creation idempotence and configuration definition. More info: http://kubernetes.io/docs/user-guide/identifiers#names | string | false |
+| labels | Map of string keys and values that can be used to organize and categorize (scope and select) objects. May match selectors of replication controllers and services. More info: http://kubernetes.io/docs/user-guide/labels | map[string]string | false |
+| annotations | Annotations is an unstructured key value map stored with a resource that may be set by external tools to store and retrieve arbitrary metadata. They are not queryable and should be preserved when modifying objects. More info: http://kubernetes.io/docs/user-guide/annotations | map[string]string | false |
 
 [Back to TOC](#table-of-contents)
 

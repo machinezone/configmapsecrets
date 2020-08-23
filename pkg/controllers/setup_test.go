@@ -45,7 +45,9 @@ func TestMain(m *testing.M) {
 	check(clientscheme.AddToScheme(scheme))
 	check(v1alpha1.AddToScheme(scheme))
 	testenv := &envtest.Environment{
-		CRDDirectoryPaths: []string{"../../manifest"},
+		CRDInstallOptions: envtest.CRDInstallOptions{
+			Paths: []string{"../../manifest"},
+		},
 	}
 	var err error
 	cfg, err = testenv.Start()

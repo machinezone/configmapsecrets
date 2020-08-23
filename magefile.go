@@ -445,7 +445,7 @@ func generateCode() error {
 }
 
 func generateCDRs() error {
-	out, err := sh.Output("controller-gen", "crd:trivialVersions=true", "paths=./pkg/...", "output:stdout")
+	out, err := sh.Output("controller-gen", "crd:crdVersions=v1", "paths=./pkg/...", "output:stdout")
 	if err != nil {
 		return err
 	}
