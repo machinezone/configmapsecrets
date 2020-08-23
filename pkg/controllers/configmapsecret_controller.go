@@ -70,7 +70,9 @@ func (r *ConfigMapSecret) InjectScheme(scheme *runtime.Scheme) error {
 // SetupWithManager sets up the reconciler with the manager.
 func (r *ConfigMapSecret) SetupWithManager(manager manager.Manager) error {
 	if r.logger == nil {
-		r.InjectLogger(pkgLog)
+		if err := r.InjectLogger(pkgLog); err != nil {
+			return err
+		}
 	}
 
 	return builder.ControllerManagedBy(manager).
@@ -222,10 +224,18 @@ func (r *ConfigMapSecret) cleanup(ctx context.Context, log logr.Logger, cms *v1a
 	return nil
 }
 
-func (r *ConfigMapSecret) sync(ctx context.Context, log logr.Logger, cms *v1alpha1.ConfigMapSecret) (bool, error) {
+func (r *ConfigMapSecret) sync(ctx context.Context, log logr.Logger, cms *v1alpha1.ConfigMapSecret) (requeue bool, err error) {
 	secret, reason, err := r.renderSecret(ctx, cms)
 	if err != nil {
-		defer r.syncRenderFailureStatus(ctx, log, cms, reason, err.Error())
+		msg := err.Error()
+		defer func() {
+			if statusErr := r.syncRenderFailureStatus(ctx, log, cms, reason, msg); statusErr != nil {
+				if err == nil {
+					err = statusErr
+				}
+				requeue = true
+			}
+		}()
 		if isConfigError(err) {
 			log.Info("Unable to render ConfigMapSecret", "warning", err)
 			return true, nil
@@ -335,7 +345,9 @@ func (r *ConfigMapSecret) renderSecret(ctx context.Context, cms *v1alpha1.Config
 		Data: data,
 		Type: corev1.SecretTypeOpaque,
 	}
-	controllerutil.SetControllerReference(cms, secret, r.scheme)
+	if err := controllerutil.SetControllerReference(cms, secret, r.scheme); err != nil {
+		return nil, internalError, err
+	}
 	return secret, "", nil
 }
 

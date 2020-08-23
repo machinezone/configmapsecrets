@@ -22,7 +22,7 @@ func NewZapLogger(c *Config) *zap.Logger {
 	}
 	if c.SampleInitial != 0 || c.SampleThereafter != 0 {
 		opts = append(opts, zap.WrapCore(func(core zapcore.Core) zapcore.Core {
-			return zapcore.NewSampler(core, time.Second, c.SampleInitial, c.SampleThereafter)
+			return zapcore.NewSamplerWithOptions(core, time.Second, c.SampleInitial, c.SampleThereafter)
 		}))
 	}
 	ws := c.WriteSyncer

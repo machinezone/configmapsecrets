@@ -42,19 +42,24 @@ func init() {
 }
 
 func TestMain(m *testing.M) {
-	clientscheme.AddToScheme(scheme)
-	v1alpha1.AddToScheme(scheme)
+	check(clientscheme.AddToScheme(scheme))
+	check(v1alpha1.AddToScheme(scheme))
 	testenv := &envtest.Environment{
 		CRDDirectoryPaths: []string{"../../manifest"},
 	}
 	var err error
-	if cfg, err = testenv.Start(); err != nil {
-		stdlog.Fatal(err)
-	}
+	cfg, err = testenv.Start()
+	check(err)
 
 	code := m.Run()
-	testenv.Stop()
+	check(testenv.Stop())
 	os.Exit(code)
+}
+
+func check(err error) {
+	if err != nil {
+		stdlog.Fatalln(err)
+	}
 }
 
 type testReconciler struct {

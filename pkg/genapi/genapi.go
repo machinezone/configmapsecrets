@@ -17,7 +17,6 @@ import (
 	"go/token"
 	"go/types"
 	"io"
-	"os"
 	"path"
 	"reflect"
 	"sort"
@@ -218,10 +217,6 @@ func ParsePackage(path string) (*Package, error) {
 		}
 	}
 	return p, nil
-}
-
-func ignoreTests(f os.FileInfo) bool {
-	return !strings.HasSuffix("_test.go", f.Name())
 }
 
 // A Constant represents a constant.

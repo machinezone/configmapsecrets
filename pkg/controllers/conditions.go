@@ -14,6 +14,8 @@ const (
 	// CreateVariablesErrorReason is the reason given when required ConfigMapSecret
 	// variables cannot be resolved.
 	CreateVariablesErrorReason = "CreateVariablesError"
+
+	internalError = "InternalError"
 )
 
 // NewConfigMapSecretCondition creates a new deployment condition.

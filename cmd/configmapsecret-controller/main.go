@@ -18,7 +18,9 @@ package main
 import (
 	"bytes"
 	"flag"
+	"fmt"
 	"io/ioutil"
+	"os"
 
 	"github.com/go-logr/zapr"
 	"github.com/machinezone/configmapsecrets/pkg/api/v1alpha1"
@@ -45,8 +47,8 @@ var (
 )
 
 func init() {
-	clientscheme.AddToScheme(scheme)
-	v1alpha1.AddToScheme(scheme)
+	check(clientscheme.AddToScheme(scheme), "Unable to add kubernetes client set to scheme")
+	check(v1alpha1.AddToScheme(scheme), "Unable to add secrets.mz.com/v1alpha1 to scheme")
 	// +kubebuilder:scaffold:scheme
 }
 
@@ -79,8 +81,8 @@ func main() {
 	// TODO(abursavich): remove CallerSkip when https://github.com/go-logr/zapr/issues/6 is fixed
 	log.SetLogger(zapr.NewLogger(logger.WithOptions(zap.AddCallerSkip(1))))
 
-	metrics.Registry.Register(logCfg.Metrics)
-	metrics.Registry.Register(buildinfo.Collector())
+	check(metrics.Registry.Register(logCfg.Metrics), "Unable to register logging metrics")
+	check(metrics.Registry.Register(buildinfo.Collector()), "Unable to register build metrics")
 
 	cfg, err := config.GetConfig()
 	check(err, "Unable to load kubeconfig")
@@ -123,6 +125,10 @@ func currentNamespace() (string, error) {
 
 func check(err error, msg string) {
 	if err != nil {
+		if logger == nil {
+			fmt.Fprintf(os.Stderr, "%s: %v", msg, err)
+			os.Exit(1)
+		}
 		logger.WithOptions(zap.AddCallerSkip(1)).Fatal(msg, zap.Error(err))
 	}
 }

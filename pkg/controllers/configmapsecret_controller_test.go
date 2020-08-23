@@ -836,21 +836,6 @@ func updateConfigMapSecretStep(key types.NamespacedName, fn func(obj *v1alpha1.C
 	}
 }
 
-func deleteConfigMapSecretStep(key types.NamespacedName) step {
-	return func(ctx context.Context, t *testing.T, r *testReconciler) {
-		t.Run("delete-configmapsecret", func(t *testing.T) {
-			g := gomega.NewWithT(t)
-			err := r.api.Delete(ctx, &v1alpha1.ConfigMapSecret{
-				ObjectMeta: metav1.ObjectMeta{
-					Namespace: key.Namespace,
-					Name:      key.Name,
-				},
-			})
-			g.Expect(err).NotTo(gomega.HaveOccurred(), "Delete ConfigMapSecret")
-		})
-	}
-}
-
 func checkStatusStep(ok bool, key types.NamespacedName) step {
 	return func(ctx context.Context, t *testing.T, r *testReconciler) {
 		t.Run("check-status", func(t *testing.T) {
