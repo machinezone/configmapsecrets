@@ -16,7 +16,6 @@ import (
 	"github.com/machinezone/configmapsecrets/pkg/api/v1alpha1"
 	"github.com/machinezone/configmapsecrets/pkg/mzlog"
 	"github.com/onsi/gomega"
-	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -37,8 +36,8 @@ func init() {
 	logCfg := mzlog.DefaultConfig()
 	logCfg.Level = zapcore.DebugLevel
 	logCfg.Encoder = mzlog.ConsoleType
-	// TODO(abursavich): remove CallerSkip when https://github.com/go-logr/zapr/issues/6 is fixed
-	log.SetLogger(zapr.NewLogger(mzlog.NewZapLogger(logCfg).WithOptions(zap.AddCallerSkip(1))))
+	logCfg.EnableStacktrace = false
+	log.SetLogger(zapr.NewLogger(mzlog.NewZapLogger(logCfg)))
 }
 
 func TestMain(m *testing.M) {
