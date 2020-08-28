@@ -15,7 +15,7 @@ import (
 	"github.com/go-logr/zapr"
 	"github.com/machinezone/configmapsecrets/pkg/api/v1alpha1"
 	"github.com/machinezone/configmapsecrets/pkg/mzlog"
-	"github.com/onsi/gomega"
+	"github.com/onsi/gomega" // TODO: remove gomega
 	"go.uber.org/zap/zapcore"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -79,6 +79,7 @@ func newTestReconciler(t *testing.T) *testReconciler {
 	ctx, cancel := context.WithCancel(context.TODO())
 	mgr, err := manager.New(cfg, manager.Options{
 		Scheme: scheme,
+		Logger: nil,
 	})
 	g.Expect(err).NotTo(gomega.HaveOccurred())
 
@@ -137,7 +138,12 @@ func (r *testReconciler) wait(key types.NamespacedName) <-chan struct{} {
 	return r.waiter(key)
 }
 
-func eventually(t *testing.T, timeout time.Duration, wait <-chan struct{}, test func(g *gomega.WithT)) {
+type T interface {
+	Errorf(format string, args ...interface{})
+	Fatalf(format string, args ...interface{})
+}
+
+func eventually(t *testing.T, timeout time.Duration, wait <-chan struct{}, test func(t T)) {
 	for {
 		// only final test if succeeds or panics
 		s := &stubT{}
@@ -149,7 +155,7 @@ func eventually(t *testing.T, timeout time.Duration, wait <-chan struct{}, test 
 					}
 				}
 			}()
-			test(gomega.NewWithT(s))
+			test(s)
 		}()
 		if !s.fail {
 			return // success
@@ -161,15 +167,21 @@ func eventually(t *testing.T, timeout time.Duration, wait <-chan struct{}, test 
 			timer.Stop()
 		case <-timer.C:
 			// final test: succeed or fail
-			test(gomega.NewWithT(t))
+			test(t)
 			return
 		}
 	}
 }
 
-type stubT struct{ fail bool }
+type stubT struct {
+	fail bool
+}
+
+func (t *stubT) Errorf(format string, args ...interface{}) {
+	t.fail = true
+}
 
 func (t *stubT) Fatalf(format string, args ...interface{}) {
-	t.fail = true
+	t.Errorf(format, args...)
 	panic(t)
 }

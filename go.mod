@@ -7,7 +7,7 @@ require (
 	github.com/Azure/go-autorest/autorest v0.11.4 // indirect
 	github.com/go-logr/logr v0.2.1-0.20200730175230-ee2de8da5be6
 	github.com/go-logr/zapr v0.2.0
-	github.com/google/go-cmp v0.5.2 // indirect
+	github.com/google/go-cmp v0.5.2
 	github.com/google/gofuzz v1.2.0 // indirect
 	github.com/googleapis/gnostic v0.5.1 // indirect
 	github.com/imdario/mergo v0.3.11 // indirect

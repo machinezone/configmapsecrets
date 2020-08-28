@@ -103,10 +103,40 @@ spec:
                       - key
                       type: object
                     value:
-                      description: "Variable references $(VAR_NAME) are expanded using the previous defined environment variables in the ConfigMapSecret. If a variable cannot be resolved, the reference in the input string will be unchanged. The $(VAR_NAME) syntax can be escaped with a double $$, ie: $$(VAR_NAME). Escaped references will never be expanded, regardless of whether the variable exists or not. \n Defaults to \"\"."
+                      description: 'Variable references $(VAR_NAME) are expanded using the previous defined environment variables in the ConfigMapSecret. If a variable cannot be resolved, the reference in the input string will be unchanged. The $(VAR_NAME) syntax can be escaped with a double $$, ie: $$(VAR_NAME). Escaped references will never be expanded, regardless of whether the variable exists or not.'
                       type: string
                   required:
                   - name
+                  type: object
+                type: array
+              varsFrom:
+                description: List of sources to populate template variables. Keys defined in a source must consist of alphanumeric characters, '-', '_' or '.'. When a key exists in multiple sources, the value associated with the last source will take precedence. Values defined by Vars with a duplicate key will take precedence.
+                items:
+                  description: VarsFromSource represents the source of a set of template variables.
+                  properties:
+                    configMapRef:
+                      description: The ConfigMap to select.
+                      properties:
+                        name:
+                          description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names TODO: Add other useful fields. apiVersion, kind, uid?'
+                          type: string
+                        optional:
+                          description: Specify whether the ConfigMap must be defined.
+                          type: boolean
+                      type: object
+                    prefix:
+                      description: An optional identifier to prepend to each key.
+                      type: string
+                    secretRef:
+                      description: The Secret to select.
+                      properties:
+                        name:
+                          description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names TODO: Add other useful fields. apiVersion, kind, uid?'
+                          type: string
+                        optional:
+                          description: Specify whether the Secret must be defined.
+                          type: boolean
+                      type: object
                   type: object
                 type: array
             type: object

@@ -9,8 +9,11 @@
 * [ConfigMapSecretSpec](#configmapsecretspec)
 * [ConfigMapSecretStatus](#configmapsecretstatus)
 * [ConfigMapTemplate](#configmaptemplate)
+* [ConfigMapVarsSource](#configmapvarssource)
+* [SecretVarsSource](#secretvarssource)
 * [TemplateMetadata](#templatemetadata)
 * [TemplateVariable](#templatevariable)
+* [VarsFromSource](#varsfromsource)
 
 ## ConfigMapSecret
 
@@ -67,6 +70,7 @@ ConfigMapSecretSpec defines the desired state of a ConfigMapSecret.
 | Field | Description | Type | Required |
 | ----- | ----------- | ---- | -------- |
 | template | Template that describes the config that will be rendered.<br/><br/>Variable references $(VAR_NAME) in template data are expanded using the ConfigMapSecret's variables. If a variable cannot be resolved, the reference in the input data will be unchanged. The $(VAR_NAME) syntax can be escaped with a double $$, ie: $$(VAR_NAME). Escaped references will never be expanded, regardless of whether the variable exists or not. | [ConfigMapTemplate](#configmaptemplate) | false |
+| varsFrom | List of sources to populate template variables. Keys defined in a source must consist of alphanumeric characters, '-', '_' or '.'. When a key exists in multiple sources, the value associated with the last source will take precedence. Values defined by Vars with a duplicate key will take precedence. | [][VarsFromSource](#varsfromsource) | false |
 | vars | List of template variables. | [][TemplateVariable](#templatevariable) | false |
 
 [Back to TOC](#table-of-contents)
@@ -94,6 +98,26 @@ ConfigMapTemplate is a ConfigMap template.
 
 [Back to TOC](#table-of-contents)
 
+## ConfigMapVarsSource
+
+ConfigMapVarsSource selects a ConfigMap to populate template variables with.
+
+| Field | Description | Type | Required |
+| ----- | ----------- | ---- | -------- |
+| optional | Specify whether the ConfigMap must be defined. | *bool | false |
+
+[Back to TOC](#table-of-contents)
+
+## SecretVarsSource
+
+SecretVarsSource selects a Secret to populate template variables with.
+
+| Field | Description | Type | Required |
+| ----- | ----------- | ---- | -------- |
+| optional | Specify whether the Secret must be defined. | *bool | false |
+
+[Back to TOC](#table-of-contents)
+
 ## TemplateMetadata
 
 TemplateMetadata is a stripped down version of the standard object metadata.
@@ -113,8 +137,20 @@ TemplateVariable is a template variable.
 | Field | Description | Type | Required |
 | ----- | ----------- | ---- | -------- |
 | name | Name of the template variable. | string | true |
-| value | Variable references $(VAR_NAME) are expanded using the previous defined environment variables in the ConfigMapSecret. If a variable cannot be resolved, the reference in the input string will be unchanged. The $(VAR_NAME) syntax can be escaped with a double $$, ie: $$(VAR_NAME). Escaped references will never be expanded, regardless of whether the variable exists or not.<br/><br/>Defaults to \"\". | string | false |
+| value | Variable references $(VAR_NAME) are expanded using the previous defined environment variables in the ConfigMapSecret. If a variable cannot be resolved, the reference in the input string will be unchanged. The $(VAR_NAME) syntax can be escaped with a double $$, ie: $$(VAR_NAME). Escaped references will never be expanded, regardless of whether the variable exists or not. | string | false |
 | secretValue | SecretValue selects a value by its key in a Secret. | *[corev1.SecretKeySelector](https://pkg.go.dev/k8s.io/api/core/v1#SecretKeySelector) | false |
 | configMapValue | ConfigMapValue selects a value by its key in a ConfigMap. | *[corev1.ConfigMapKeySelector](https://pkg.go.dev/k8s.io/api/core/v1#ConfigMapKeySelector) | false |
+
+[Back to TOC](#table-of-contents)
+
+## VarsFromSource
+
+VarsFromSource represents the source of a set of template variables.
+
+| Field | Description | Type | Required |
+| ----- | ----------- | ---- | -------- |
+| prefix | An optional identifier to prepend to each key. | string | false |
+| secretRef | The Secret to select. | *[SecretVarsSource](#secretvarssource) | false |
+| configMapRef | The ConfigMap to select. | *[ConfigMapVarsSource](#configmapvarssource) | false |
 
 [Back to TOC](#table-of-contents)

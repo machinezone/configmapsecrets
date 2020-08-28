@@ -58,6 +58,13 @@ type ConfigMapSecretSpec struct {
 	// regardless of whether the variable exists or not.
 	Template ConfigMapTemplate `json:"template,omitempty"`
 
+	// List of sources to populate template variables.
+	// Keys defined in a source must consist of alphanumeric characters, '-', '_' or '.'.
+	// When a key exists in multiple sources, the value associated with the last
+	// source will take precedence. Values defined by Vars with a duplicate key
+	// will take precedence.
+	VarsFrom []VarsFromSource `json:"varsFrom,omitempty"`
+
 	// List of template variables.
 	Vars []TemplateVariable `json:"vars,omitempty"`
 }
@@ -116,8 +123,6 @@ type TemplateVariable struct {
 	// the reference in the input string will be unchanged. The $(VAR_NAME) syntax
 	// can be escaped with a double $$, ie: $$(VAR_NAME). Escaped references will
 	// never be expanded, regardless of whether the variable exists or not.
-	//
-	// Defaults to "".
 	Value string `json:"value,omitempty"`
 
 	// SecretValue selects a value by its key in a Secret.
@@ -125,6 +130,36 @@ type TemplateVariable struct {
 
 	// ConfigMapValue selects a value by its key in a ConfigMap.
 	ConfigMapValue *corev1.ConfigMapKeySelector `json:"configMapValue,omitempty"`
+}
+
+// VarsFromSource represents the source of a set of template variables.
+type VarsFromSource struct {
+	// An optional identifier to prepend to each key.
+	Prefix string `json:"prefix,omitempty"`
+
+	// The Secret to select.
+	SecretRef *SecretVarsSource `json:"secretRef,omitempty"`
+
+	// The ConfigMap to select.
+	ConfigMapRef *ConfigMapVarsSource `json:"configMapRef,omitempty"`
+}
+
+// SecretVarsSource selects a Secret to populate template variables with.
+type SecretVarsSource struct {
+	// The Secret to select.
+	corev1.LocalObjectReference `json:",inline"`
+
+	// Specify whether the Secret must be defined.
+	Optional *bool `json:"optional,omitempty"`
+}
+
+// ConfigMapVarsSource selects a ConfigMap to populate template variables with.
+type ConfigMapVarsSource struct {
+	// The ConfigMap to select.
+	corev1.LocalObjectReference `json:",inline"`
+
+	// Specify whether the ConfigMap must be defined.
+	Optional *bool `json:"optional,omitempty"`
 }
 
 // ConfigMapSecretStatus describes the observed state of a ConfigMapSecret.

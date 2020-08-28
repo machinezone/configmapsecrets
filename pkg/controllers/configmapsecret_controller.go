@@ -9,6 +9,8 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"sort"
+	"strings"
 	"sync"
 
 	"github.com/go-logr/logr"
@@ -20,6 +22,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/validation"
+	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -37,9 +41,10 @@ var pkgLog = log.Log.WithName("controllers")
 
 // ConfigMapSecret reconciles a ConfigMapSecret object
 type ConfigMapSecret struct {
-	client client.Client
-	scheme *runtime.Scheme
-	logger logr.Logger
+	client   client.Client
+	scheme   *runtime.Scheme
+	logger   logr.Logger
+	recorder record.EventRecorder
 
 	mu         sync.RWMutex
 	secrets    refMap
@@ -67,12 +72,19 @@ func (r *ConfigMapSecret) InjectScheme(scheme *runtime.Scheme) error {
 	return nil
 }
 
+// InjectEventRecorder injects the recorder into the reconciler.
+func (r *ConfigMapSecret) InjectEventRecorder(recorder record.EventRecorder) error {
+	r.recorder = recorder
+	return nil
+}
+
 // SetupWithManager sets up the reconciler with the manager.
 func (r *ConfigMapSecret) SetupWithManager(manager manager.Manager) error {
 	if r.logger == nil {
-		if err := r.InjectLogger(pkgLog); err != nil {
-			return err
-		}
+		r.logger = pkgLog
+	}
+	if r.recorder == nil {
+		r.recorder = manager.GetEventRecorderFor("configmapsecret-controller")
 	}
 
 	return builder.ControllerManagedBy(manager).
@@ -177,7 +189,7 @@ func (r *ConfigMapSecret) Reconcile(req reconcile.Request) (reconcile.Result, er
 		return reconcile.Result{}, err
 	}
 	// Set the Secret and ConfigMap references for the instance
-	secretNames, configMapNames := varRefs(cms.Spec.Vars)
+	secretNames, configMapNames := varRefs(cms.Spec.VarsFrom, cms.Spec.Vars)
 	r.setRefs(cms.Namespace, cms.Name, secretNames, configMapNames)
 
 	// Sync and cleanup
@@ -360,6 +372,43 @@ func (r *ConfigMapSecret) makeVariables(ctx context.Context, cms *v1alpha1.Confi
 	configMaps := make(map[string]*corev1.ConfigMap)
 	secrets := make(map[string]*corev1.Secret)
 
+	for _, v := range cms.Spec.VarsFrom {
+		var (
+			kind, name  string
+			invalidKeys []string
+			srcVars     map[string]string
+		)
+		switch {
+		case v.SecretRef != nil:
+			kind = "Secret"
+			name = v.SecretRef.Name
+			srcVars, invalidKeys, err = r.secretValues(ctx, secrets, cms.Namespace, v.Prefix, *v.SecretRef)
+		case v.ConfigMapRef != nil:
+			kind = "ConfigMap"
+			name = v.ConfigMapRef.Name
+			srcVars, invalidKeys, err = r.configMapValues(ctx, configMaps, cms.Namespace, v.Prefix, *v.ConfigMapRef)
+		}
+		if err != nil {
+			return nil, err
+		}
+		for k, v := range srcVars {
+			vars[k] = v
+		}
+		if len(invalidKeys) > 0 {
+			sort.Strings(invalidKeys)
+			r.recorder.Eventf(
+				cms,
+				corev1.EventTypeWarning,
+				"InvalidTemplateVariableNames",
+				"Keys [%s] from the VarsFrom %s %s/%s were skipped since they are considered invalid template variable names.",
+				strings.Join(invalidKeys, ", "),
+				kind,
+				cms.Namespace,
+				name,
+			)
+		}
+	}
+
 	for _, v := range cms.Spec.Vars {
 		val := v.Value
 		found := true
@@ -368,9 +417,9 @@ func (r *ConfigMapSecret) makeVariables(ctx context.Context, cms *v1alpha1.Confi
 		case val != "":
 			val = expansion.Expand(val, mappingFn)
 		case v.SecretValue != nil:
-			val, found, err = r.secretValue(ctx, secrets, cms.Namespace, v.SecretValue)
+			val, found, err = r.secretValue(ctx, secrets, cms.Namespace, *v.SecretValue)
 		case v.ConfigMapValue != nil:
-			val, found, err = r.configMapValue(ctx, configMaps, cms.Namespace, v.ConfigMapValue)
+			val, found, err = r.configMapValue(ctx, configMaps, cms.Namespace, *v.ConfigMapValue)
 		}
 
 		if err != nil {
@@ -386,54 +435,116 @@ func (r *ConfigMapSecret) makeVariables(ctx context.Context, cms *v1alpha1.Confi
 	return vars, nil
 }
 
-func (r *ConfigMapSecret) secretValue(ctx context.Context, cache map[string]*corev1.Secret, namespace string, ref *corev1.SecretKeySelector) (value string, found bool, err error) {
+func (r *ConfigMapSecret) secret(ctx context.Context, cache map[string]*corev1.Secret, namespace string, ref v1alpha1.SecretVarsSource) (secret *corev1.Secret, err error) {
 	name := ref.Name
-	key := ref.Key
-	optional := ref.Optional != nil && *ref.Optional
-
 	secret, found := cache[name]
-	if !found {
-		secret = &corev1.Secret{}
-		err := r.client.Get(ctx, types.NamespacedName{Namespace: namespace, Name: name}, secret)
-		if err != nil {
-			if apierrors.IsNotFound(err) {
-				if optional {
-					return "", false, nil
-				}
-				return "", false, &configError{err}
+	if found {
+		return secret, nil
+	}
+	secret = &corev1.Secret{}
+	err = r.client.Get(ctx, types.NamespacedName{Namespace: namespace, Name: name}, secret)
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			if ref.Optional != nil && *ref.Optional {
+				return nil, nil
 			}
-			return "", false, err
+			return nil, &configError{err}
 		}
-		cache[name] = secret
+		return nil, err
+	}
+	cache[name] = secret
+	return secret, nil
+}
+
+func (r *ConfigMapSecret) secretValues(ctx context.Context, cache map[string]*corev1.Secret, namespace, prefix string, ref v1alpha1.SecretVarsSource) (values map[string]string, invalidKeys []string, err error) {
+	secret, err := r.secret(ctx, cache, namespace, ref)
+	if secret == nil || err != nil {
+		return nil, nil, err
+	}
+	values = make(map[string]string, len(secret.Data))
+	for k, v := range secret.Data {
+		switch k, valid := validPrefixedKey(prefix, k); valid {
+		case true:
+			values[k] = string(v)
+		case false:
+			invalidKeys = append(invalidKeys, k)
+		}
+	}
+	return values, invalidKeys, nil
+}
+
+func (r *ConfigMapSecret) secretValue(ctx context.Context, cache map[string]*corev1.Secret, namespace string, ref corev1.SecretKeySelector) (value string, found bool, err error) {
+	key := ref.Key
+	secret, err := r.secret(ctx, cache, namespace, v1alpha1.SecretVarsSource{
+		LocalObjectReference: ref.LocalObjectReference,
+		Optional:             ref.Optional,
+	})
+	if secret == nil || err != nil {
+		return "", false, err
 	}
 	if buf, found := secret.Data[key]; found {
 		return string(buf), true, nil
 	}
-	if optional {
+	if ref.Optional != nil && *ref.Optional {
 		return "", false, nil
 	}
-	return "", false, newConfigError("Couldn't find key %s in Secret %s/%s", key, namespace, name)
+	return "", false, newConfigError("Couldn't find key %s in Secret %s/%s", key, namespace, ref.Name)
 }
 
-func (r *ConfigMapSecret) configMapValue(ctx context.Context, cache map[string]*corev1.ConfigMap, namespace string, ref *corev1.ConfigMapKeySelector) (value string, found bool, err error) {
+func (r *ConfigMapSecret) configMap(ctx context.Context, cache map[string]*corev1.ConfigMap, namespace string, ref v1alpha1.ConfigMapVarsSource) (configMap *corev1.ConfigMap, err error) {
 	name := ref.Name
-	key := ref.Key
-	optional := ref.Optional != nil && *ref.Optional
-
 	configMap, found := cache[name]
-	if !found {
-		configMap = &corev1.ConfigMap{}
-		err := r.client.Get(ctx, types.NamespacedName{Namespace: namespace, Name: name}, configMap)
-		if err != nil {
-			if apierrors.IsNotFound(err) {
-				if optional {
-					return "", false, nil
-				}
-				return "", false, &configError{err}
+	if found {
+		return configMap, nil
+	}
+	configMap = &corev1.ConfigMap{}
+	err = r.client.Get(ctx, types.NamespacedName{Namespace: namespace, Name: name}, configMap)
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			if ref.Optional != nil && *ref.Optional {
+				return nil, nil
 			}
-			return "", false, err
+			return nil, &configError{err}
 		}
-		cache[name] = configMap
+		return nil, err
+	}
+	cache[name] = configMap
+	return configMap, nil
+}
+
+func (r *ConfigMapSecret) configMapValues(ctx context.Context, cache map[string]*corev1.ConfigMap, namespace, prefix string, ref v1alpha1.ConfigMapVarsSource) (values map[string]string, invalidKeys []string, err error) {
+	configMap, err := r.configMap(ctx, cache, namespace, ref)
+	if configMap == nil || err != nil {
+		return nil, nil, err
+	}
+	values = make(map[string]string, len(configMap.Data)+len(configMap.BinaryData))
+	for k, v := range configMap.Data {
+		switch k, valid := validPrefixedKey(prefix, k); valid {
+		case true:
+			values[k] = v
+		case false:
+			invalidKeys = append(invalidKeys, k)
+		}
+	}
+	for k, v := range configMap.BinaryData {
+		switch k, valid := validPrefixedKey(prefix, k); valid {
+		case true:
+			values[k] = string(v)
+		case false:
+			invalidKeys = append(invalidKeys, k)
+		}
+	}
+	return values, invalidKeys, nil
+}
+
+func (r *ConfigMapSecret) configMapValue(ctx context.Context, cache map[string]*corev1.ConfigMap, namespace string, ref corev1.ConfigMapKeySelector) (value string, found bool, err error) {
+	key := ref.Key
+	configMap, err := r.configMap(ctx, cache, namespace, v1alpha1.ConfigMapVarsSource{
+		LocalObjectReference: ref.LocalObjectReference,
+		Optional:             ref.Optional,
+	})
+	if configMap == nil || err != nil {
+		return "", false, err
 	}
 	if str, found := configMap.Data[key]; found {
 		return str, true, nil
@@ -441,10 +552,10 @@ func (r *ConfigMapSecret) configMapValue(ctx context.Context, cache map[string]*
 	if buf, found := configMap.BinaryData[key]; found {
 		return string(buf), true, nil
 	}
-	if optional {
+	if ref.Optional != nil && *ref.Optional {
 		return "", false, nil
 	}
-	return "", false, newConfigError("Couldn't find key %s in ConfigMap %s/%s", key, namespace, name)
+	return "", false, newConfigError("Couldn't find key %s in ConfigMap %s/%s", key, namespace, ref.Name)
 }
 
 func (r *ConfigMapSecret) syncSuccessStatus(ctx context.Context, log logr.Logger, cms *v1alpha1.ConfigMapSecret) error {
@@ -472,6 +583,16 @@ func (r *ConfigMapSecret) syncStatus(ctx context.Context, log logr.Logger, cms *
 		return err
 	}
 	return nil
+}
+
+func validPrefixedKey(prefix, key string) (string, bool) {
+	if prefix != "" {
+		key = prefix + key
+	}
+	if errMsgs := validation.IsEnvVarName(key); len(errMsgs) > 0 {
+		return key, false
+	}
+	return key, true
 }
 
 func getOwner(secret *corev1.Secret) *metav1.OwnerReference {
@@ -510,19 +631,33 @@ func toReqs(namespace string, names map[string]bool) []reconcile.Request {
 	return reqs
 }
 
-func varRefs(vars []v1alpha1.TemplateVariable) (secrets, configMaps map[string]bool) {
+func varRefs(varsFrom []v1alpha1.VarsFromSource, vars []v1alpha1.TemplateVariable) (secrets, configMaps map[string]bool) {
+	addSecret := func(name string) {
+		if secrets == nil {
+			secrets = make(map[string]bool)
+		}
+		secrets[name] = true
+	}
+	addConfigMap := func(name string) {
+		if configMaps == nil {
+			configMaps = make(map[string]bool)
+		}
+		configMaps[name] = true
+	}
+	for _, v := range varsFrom {
+		if v.SecretRef != nil {
+			addSecret(v.SecretRef.Name)
+		}
+		if v.ConfigMapRef != nil {
+			addConfigMap(v.ConfigMapRef.Name)
+		}
+	}
 	for _, v := range vars {
 		if v.SecretValue != nil {
-			if secrets == nil {
-				secrets = make(map[string]bool)
-			}
-			secrets[v.SecretValue.Name] = true
+			addSecret(v.SecretValue.Name)
 		}
 		if v.ConfigMapValue != nil {
-			if configMaps == nil {
-				configMaps = make(map[string]bool)
-			}
-			configMaps[v.ConfigMapValue.Name] = true
+			addConfigMap(v.ConfigMapValue.Name)
 		}
 	}
 	return secrets, configMaps

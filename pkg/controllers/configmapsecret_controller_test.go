@@ -10,13 +10,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/onsi/gomega"
+	"github.com/google/go-cmp/cmp"
+	"github.com/onsi/gomega" // TODO: remove gomega
+	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/types"
 
 	"github.com/machinezone/configmapsecrets/pkg/api/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 )
 
 const timeout = time.Second * 10
@@ -740,6 +741,357 @@ func TestReconciler(t *testing.T) {
 		},
 
 		{
+			name: "varsfrom-secrets",
+			steps: []step{
+				createSecretStep(&corev1.Secret{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "varsfrom-secrets-foo",
+						Namespace: "default",
+					},
+					StringData: map[string]string{
+						"FOO": "abc",
+						"BAR": "ijk",
+						"BAZ": "pqr",
+						"QUX": "xyz",
+					},
+				}),
+				createSecretStep(&corev1.Secret{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "varsfrom-secrets-baz",
+						Namespace: "default",
+					},
+					StringData: map[string]string{
+						"TEST_BAZ": "baz",
+					},
+				}),
+				createConfigMapSecretStep(&v1alpha1.ConfigMapSecret{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "varsfrom-secrets",
+						Namespace: "default",
+					},
+					Spec: v1alpha1.ConfigMapSecretSpec{
+						Template: v1alpha1.ConfigMapTemplate{
+							Data: map[string]string{
+								"foo": "foo: $(TEST_FOO)",
+								"bar": "bar: $(TEST_BAR)",
+								"baz": "baz: $(TEST_BAZ)",
+								"qux": "qux: $(TEST_QUX)",
+							},
+						},
+						VarsFrom: []v1alpha1.VarsFromSource{
+							{
+								Prefix: "TEST_",
+								SecretRef: &v1alpha1.SecretVarsSource{
+									LocalObjectReference: corev1.LocalObjectReference{
+										Name: "varsfrom-secrets-foo",
+									},
+								},
+							},
+							{
+								SecretRef: &v1alpha1.SecretVarsSource{
+									LocalObjectReference: corev1.LocalObjectReference{
+										Name: "varsfrom-secrets-baz",
+									},
+									Optional: boolPtr(true),
+								},
+							},
+						},
+						Vars: []v1alpha1.TemplateVariable{
+							{
+								Name:  "TEST_QUX",
+								Value: "var",
+							},
+						},
+					},
+				}),
+				checkSecretStep(&corev1.Secret{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "varsfrom-secrets",
+						Namespace: "default",
+					},
+					Data: map[string][]byte{
+						"foo": []byte("foo: abc"),
+						"bar": []byte("bar: ijk"),
+						"baz": []byte("baz: baz"),
+						"qux": []byte("qux: var"),
+					},
+				}),
+				checkStatusStep(true, types.NamespacedName{
+					Name:      "varsfrom-secrets",
+					Namespace: "default",
+				}),
+			},
+			subTests: []test{
+				{
+					name: "update-secret",
+					steps: []step{
+						updateSecretStep(
+							types.NamespacedName{
+								Name:      "varsfrom-secrets-foo",
+								Namespace: "default",
+							},
+							func(obj *corev1.Secret) {
+								obj.Data = nil
+								obj.StringData = map[string]string{
+									"FOO": "abc",
+									"BAR": "bar",
+									"BAZ": "pqr",
+									"QUX": "xyz",
+								}
+							},
+						),
+						checkSecretStep(&corev1.Secret{
+							ObjectMeta: metav1.ObjectMeta{
+								Name:      "varsfrom-secrets",
+								Namespace: "default",
+							},
+							Data: map[string][]byte{
+								"foo": []byte("foo: abc"),
+								"bar": []byte("bar: bar"),
+								"baz": []byte("baz: baz"),
+								"qux": []byte("qux: var"),
+							},
+						}),
+						checkStatusStep(true, types.NamespacedName{
+							Name:      "varsfrom-secrets",
+							Namespace: "default",
+						}),
+					},
+				},
+				{
+					name: "delete-optional-secret",
+					steps: []step{
+						deleteSecretStep(types.NamespacedName{
+							Name:      "varsfrom-secrets-baz",
+							Namespace: "default",
+						}),
+						checkSecretStep(&corev1.Secret{
+							// TODO: why is this test flaky?
+							ObjectMeta: metav1.ObjectMeta{
+								Name:      "varsfrom-secrets",
+								Namespace: "default",
+							},
+							Data: map[string][]byte{
+								"foo": []byte("foo: abc"),
+								"bar": []byte("bar: bar"),
+								"baz": []byte("baz: pqr"),
+								"qux": []byte("qux: var"),
+							},
+						}),
+						checkStatusStep(true, types.NamespacedName{
+							Name:      "varsfrom-secrets",
+							Namespace: "default",
+						}),
+					},
+				},
+				{
+					name: "delete-vars",
+					steps: []step{
+						updateConfigMapSecretStep(
+							types.NamespacedName{
+								Name:      "varsfrom-secrets",
+								Namespace: "default",
+							},
+							func(obj *v1alpha1.ConfigMapSecret) {
+								obj.Spec.Vars = nil
+							},
+						),
+						checkSecretStep(&corev1.Secret{
+							ObjectMeta: metav1.ObjectMeta{
+								Name:      "varsfrom-secrets",
+								Namespace: "default",
+							},
+							Data: map[string][]byte{
+								"foo": []byte("foo: abc"),
+								"bar": []byte("bar: bar"),
+								"baz": []byte("baz: pqr"),
+								"qux": []byte("qux: xyz"),
+							},
+						}),
+						checkStatusStep(true, types.NamespacedName{
+							Name:      "varsfrom-secrets",
+							Namespace: "default",
+						}),
+					},
+				},
+			},
+			parallel: true,
+		},
+
+		{
+			name: "varsfrom-configmaps",
+			steps: []step{
+				createConfigMapStep(&corev1.ConfigMap{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "varsfrom-configmaps-foo",
+						Namespace: "default",
+					},
+					Data: map[string]string{
+						"FOO": "abc",
+						"BAR": "ijk",
+					},
+					BinaryData: map[string][]byte{
+						"BAZ": []byte("pqr"),
+						"QUX": []byte("xyz"),
+					},
+				}),
+				createConfigMapStep(&corev1.ConfigMap{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "varsfrom-configmaps-baz",
+						Namespace: "default",
+					},
+					Data: map[string]string{
+						"TEST_BAZ": "baz",
+					},
+				}),
+				createConfigMapSecretStep(&v1alpha1.ConfigMapSecret{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "varsfrom-configmaps",
+						Namespace: "default",
+					},
+					Spec: v1alpha1.ConfigMapSecretSpec{
+						Template: v1alpha1.ConfigMapTemplate{
+							Data: map[string]string{
+								"foo": "foo: $(TEST_FOO)",
+								"bar": "bar: $(TEST_BAR)",
+								"baz": "baz: $(TEST_BAZ)",
+								"qux": "qux: $(TEST_QUX)",
+							},
+						},
+						VarsFrom: []v1alpha1.VarsFromSource{
+							{
+								Prefix: "TEST_",
+								ConfigMapRef: &v1alpha1.ConfigMapVarsSource{
+									LocalObjectReference: corev1.LocalObjectReference{
+										Name: "varsfrom-configmaps-foo",
+									},
+								},
+							},
+							{
+								ConfigMapRef: &v1alpha1.ConfigMapVarsSource{
+									LocalObjectReference: corev1.LocalObjectReference{
+										Name: "varsfrom-configmaps-baz",
+									},
+									Optional: boolPtr(true),
+								},
+							},
+						},
+						Vars: []v1alpha1.TemplateVariable{
+							{
+								Name:  "TEST_QUX",
+								Value: "var",
+							},
+						},
+					},
+				}),
+				checkSecretStep(&corev1.Secret{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "varsfrom-configmaps",
+						Namespace: "default",
+					},
+					Data: map[string][]byte{
+						"foo": []byte("foo: abc"),
+						"bar": []byte("bar: ijk"),
+						"baz": []byte("baz: baz"),
+						"qux": []byte("qux: var"),
+					},
+				}),
+				checkStatusStep(true, types.NamespacedName{
+					Name:      "varsfrom-configmaps",
+					Namespace: "default",
+				}),
+			},
+			subTests: []test{
+				{
+					name: "update-secret",
+					steps: []step{
+						updateConfigMapStep(
+							types.NamespacedName{
+								Name:      "varsfrom-configmaps-foo",
+								Namespace: "default",
+							},
+							func(obj *corev1.ConfigMap) {
+								obj.Data["BAR"] = "bar"
+							},
+						),
+						checkSecretStep(&corev1.Secret{
+							ObjectMeta: metav1.ObjectMeta{
+								Name:      "varsfrom-configmaps",
+								Namespace: "default",
+							},
+							Data: map[string][]byte{
+								"foo": []byte("foo: abc"),
+								"bar": []byte("bar: bar"),
+								"baz": []byte("baz: baz"),
+								"qux": []byte("qux: var"),
+							},
+						}),
+						checkStatusStep(true, types.NamespacedName{
+							Name:      "varsfrom-configmaps",
+							Namespace: "default",
+						}),
+					},
+				},
+				{
+					name: "delete-optional-configmap",
+					steps: []step{
+						deleteConfigMapStep(types.NamespacedName{
+							Name:      "varsfrom-configmaps-baz",
+							Namespace: "default",
+						}),
+						checkSecretStep(&corev1.Secret{
+							ObjectMeta: metav1.ObjectMeta{
+								Name:      "varsfrom-configmaps",
+								Namespace: "default",
+							},
+							Data: map[string][]byte{
+								"foo": []byte("foo: abc"),
+								"bar": []byte("bar: bar"),
+								"baz": []byte("baz: pqr"),
+								"qux": []byte("qux: var"),
+							},
+						}),
+						checkStatusStep(true, types.NamespacedName{
+							Name:      "varsfrom-configmaps",
+							Namespace: "default",
+						}),
+					},
+				},
+				{
+					name: "delete-vars",
+					steps: []step{
+						updateConfigMapSecretStep(
+							types.NamespacedName{
+								Name:      "varsfrom-configmaps",
+								Namespace: "default",
+							},
+							func(obj *v1alpha1.ConfigMapSecret) {
+								obj.Spec.Vars = nil
+							},
+						),
+						checkSecretStep(&corev1.Secret{
+							ObjectMeta: metav1.ObjectMeta{
+								Name:      "varsfrom-configmaps",
+								Namespace: "default",
+							},
+							Data: map[string][]byte{
+								"foo": []byte("foo: abc"),
+								"bar": []byte("bar: bar"),
+								"baz": []byte("baz: pqr"),
+								"qux": []byte("qux: xyz"),
+							},
+						}),
+						checkStatusStep(true, types.NamespacedName{
+							Name:      "varsfrom-configmaps",
+							Namespace: "default",
+						}),
+					},
+				},
+			},
+			parallel: true,
+		},
+
+		{
 			name: "render-failure",
 			steps: []step{
 				createConfigMapSecretStep(&v1alpha1.ConfigMapSecret{
@@ -840,10 +1192,14 @@ func checkStatusStep(ok bool, key types.NamespacedName) step {
 	return func(ctx context.Context, t *testing.T, r *testReconciler) {
 		t.Run("check-status", func(t *testing.T) {
 			var obj v1alpha1.ConfigMapSecret
-			eventually(t, timeout, r.wait(key), func(g *gomega.WithT) {
+			eventually(t, timeout, r.wait(key), func(t T) {
 				obj = v1alpha1.ConfigMapSecret{} // reset
-				g.Expect(r.api.Get(ctx, key, &obj)).NotTo(gomega.HaveOccurred(), "Get ConfigMapSecret")
-				g.Expect(obj.Status.ObservedGeneration).To(gomega.Equal(obj.Generation), "Observed Generation")
+				if err := r.api.Get(ctx, key, &obj); err != nil {
+					t.Fatalf("failed to get ConfigMapSecret: %v", err)
+				}
+				if gen, obs := obj.Generation, obj.Status.ObservedGeneration; gen != obs {
+					t.Fatalf("ObservedGeneration doesn't match Generation; %d != %d", obs, gen)
+				}
 			})
 			g := gomega.NewWithT(t)
 			g.Expect(obj.Status.Conditions).To(gomega.HaveLen(1), "Conditions")
@@ -943,16 +1299,26 @@ func deleteSecretStep(key types.NamespacedName) step {
 	}
 }
 
+var bytesToString = cmp.Transformer("bytesToString", func(b []byte) string { return string(b) })
+
 func checkSecretStep(want *corev1.Secret) step {
 	return func(ctx context.Context, t *testing.T, r *testReconciler) {
 		t.Run("check-secret", func(t *testing.T) {
 			key := types.NamespacedName{Name: want.GetName(), Namespace: want.GetNamespace()}
-			eventually(t, timeout, r.wait(key), func(g *gomega.WithT) {
+			eventually(t, timeout, r.wait(key), func(t T) {
 				got := &corev1.Secret{}
-				g.Expect(r.api.Get(ctx, key, got)).NotTo(gomega.HaveOccurred(), "Secret exists")
-				g.Expect(got.GetLabels()).To(gomega.Equal(want.GetLabels()), "Secret labels match")
-				g.Expect(got.GetAnnotations()).To(gomega.Equal(want.GetAnnotations()), "Secret annotations match")
-				g.Expect(got.Data).To(gomega.Equal(want.Data), "Secret data matches")
+				if err := r.api.Get(ctx, key, got); err != nil {
+					t.Fatalf("failed to get secret: %v", err)
+				}
+				if diff := cmp.Diff(want.Labels, got.Labels); diff != "" {
+					t.Errorf("unexpected labels diff:\n\n%v", diff)
+				}
+				if diff := cmp.Diff(want.Annotations, got.Annotations); diff != "" {
+					t.Errorf("unexpected annotations diff:\n\n%v", diff)
+				}
+				if diff := cmp.Diff(want.Data, got.Data, bytesToString); diff != "" {
+					t.Errorf("unexpected data diff:\n\n%v", diff)
+				}
 			})
 		})
 	}
