@@ -17,11 +17,14 @@ import (
 	"go/token"
 	"go/types"
 	"io"
+	"net/url"
 	"path"
 	"reflect"
 	"sort"
 	"strconv"
 	"strings"
+	"unicode"
+	"unicode/utf8"
 
 	"golang.org/x/tools/go/packages"
 )
@@ -355,9 +358,13 @@ func hasComment(comments []*ast.Comment, comment string) bool {
 // https://github.com/coreos/prometheus-operator/blob/master/cmd/po-docgen/api.go
 func fmtRawDoc(rawDoc string) string {
 	var buffer bytes.Buffer
-	delPrevChar := func() {
-		if buffer.Len() > 0 {
-			buffer.Truncate(buffer.Len() - 1) // Delete the last " " or "\n"
+	trimSpace := func() {
+		for {
+			r, n := utf8.DecodeLastRune(buffer.Bytes())
+			if r == utf8.RuneError || !unicode.IsSpace(r) {
+				return
+			}
+			buffer.Truncate(buffer.Len() - n)
 		}
 	}
 
@@ -369,13 +376,20 @@ func fmtRawDoc(rawDoc string) string {
 		leading := strings.TrimLeft(line, " ")
 		switch {
 		case len(line) == 0: // Keep paragraphs
-			delPrevChar()
+			trimSpace()
 			buffer.WriteString("\n\n")
 		case strings.HasPrefix(leading, "TODO"): // Ignore one line TODOs
 		case strings.HasPrefix(leading, "+"): // Ignore instructions to go2idl
 		default:
-			if strings.HasPrefix(line, " ") || strings.HasPrefix(line, "\t") {
-				delPrevChar()
+			if strings.HasPrefix(line, "More info:") {
+				suffix := strings.TrimPrefix(line, "More info:")
+				suffix = strings.TrimSuffix(suffix, ".")
+				suffix = strings.TrimSpace(suffix)
+				if _, err := url.Parse(suffix); err == nil {
+					line = "[More info](" + suffix + ")."
+				}
+			} else if strings.HasPrefix(line, " ") || strings.HasPrefix(line, "\t") {
+				trimSpace()
 				line = "\n" + line + "\n" // Replace it with newline. This is useful when we have a line with: "Example:\n\tJSON-someting..."
 			} else {
 				line += " "

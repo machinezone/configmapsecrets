@@ -18,9 +18,9 @@ ConfigMapSecret holds configuration data with embedded secrets.
 
 | Field | Description | Type | Required |
 | ----- | ----------- | ---- | -------- |
-| metadata | Standard object metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata | [metav1.ObjectMeta](https://pkg.go.dev/k8s.io/apimachinery/pkg/apis/meta/v1#ObjectMeta) | false |
-| spec | Desired state of the ConfigMapSecret. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status | [ConfigMapSecretSpec](#configmapsecretspec) | false |
-| status | Observed state of the ConfigMapSecret. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status | [ConfigMapSecretStatus](#configmapsecretstatus) | false |
+| metadata | Standard object metadata. [More info](https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata). | [metav1.ObjectMeta](https://pkg.go.dev/k8s.io/apimachinery/pkg/apis/meta/v1#ObjectMeta) | false |
+| spec | Desired state of the ConfigMapSecret. [More info](https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status). | [ConfigMapSecretSpec](#configmapsecretspec) | false |
+| status | Observed state of the ConfigMapSecret. [More info](https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status). | [ConfigMapSecretStatus](#configmapsecretstatus) | false |
 
 [Back to TOC](#table-of-contents)
 
@@ -55,7 +55,7 @@ ConfigMapSecretList contains a list of ConfigMapSecrets.
 
 | Field | Description | Type | Required |
 | ----- | ----------- | ---- | -------- |
-| metadata | Standard list metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#lists-and-simple-kinds | [metav1.ListMeta](https://pkg.go.dev/k8s.io/apimachinery/pkg/apis/meta/v1#ListMeta) | false |
+| metadata | Standard list metadata. [More info](https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#lists-and-simple-kinds). | [metav1.ListMeta](https://pkg.go.dev/k8s.io/apimachinery/pkg/apis/meta/v1#ListMeta) | false |
 | items | List of ConfigMapSecrets. | [][ConfigMapSecret](#configmapsecret) | true |
 
 [Back to TOC](#table-of-contents)
@@ -100,9 +100,9 @@ TemplateMetadata is a stripped down version of the standard object metadata.
 
 | Field | Description | Type | Required |
 | ----- | ----------- | ---- | -------- |
-| name | Name must be unique within a namespace. Is required when creating resources, although some resources may allow a client to request the generation of an appropriate name automatically. Name is primarily intended for creation idempotence and configuration definition. More info: http://kubernetes.io/docs/user-guide/identifiers#names | string | false |
-| labels | Map of string keys and values that can be used to organize and categorize (scope and select) objects. May match selectors of replication controllers and services. More info: http://kubernetes.io/docs/user-guide/labels | map[string]string | false |
-| annotations | Annotations is an unstructured key value map stored with a resource that may be set by external tools to store and retrieve arbitrary metadata. They are not queryable and should be preserved when modifying objects. More info: http://kubernetes.io/docs/user-guide/annotations | map[string]string | false |
+| name | Name must be unique within a namespace. Is required when creating resources, although some resources may allow a client to request the generation of an appropriate name automatically. Name is primarily intended for creation idempotence and configuration definition. [More info](https://kubernetes.io/docs/user-guide/identifiers#names). | string | false |
+| labels | Map of string keys and values that can be used to organize and categorize (scope and select) objects. May match selectors of replication controllers and services. [More info](https://kubernetes.io/docs/user-guide/labels). | map[string]string | false |
+| annotations | Annotations is an unstructured key value map stored with a resource that may be set by external tools to store and retrieve arbitrary metadata. They are not queryable and should be preserved when modifying objects. [More info](https://kubernetes.io/docs/user-guide/annotations). | map[string]string | false |
 
 [Back to TOC](#table-of-contents)
 

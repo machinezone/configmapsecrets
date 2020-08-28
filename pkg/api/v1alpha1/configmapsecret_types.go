@@ -90,19 +90,19 @@ type TemplateMetadata struct {
 	// some resources may allow a client to request the generation of an appropriate name
 	// automatically. Name is primarily intended for creation idempotence and configuration
 	// definition.
-	// More info: http://kubernetes.io/docs/user-guide/identifiers#names
+	// More info: https://kubernetes.io/docs/user-guide/identifiers#names
 	Name string `json:"name,omitempty"`
 
 	// Map of string keys and values that can be used to organize and categorize
 	// (scope and select) objects. May match selectors of replication controllers
 	// and services.
-	// More info: http://kubernetes.io/docs/user-guide/labels
+	// More info: https://kubernetes.io/docs/user-guide/labels
 	Labels map[string]string `json:"labels,omitempty"`
 
 	// Annotations is an unstructured key value map stored with a resource that may be
 	// set by external tools to store and retrieve arbitrary metadata. They are not
 	// queryable and should be preserved when modifying objects.
-	// More info: http://kubernetes.io/docs/user-guide/annotations
+	// More info: https://kubernetes.io/docs/user-guide/annotations
 	Annotations map[string]string `json:"annotations,omitempty"`
 }
 
