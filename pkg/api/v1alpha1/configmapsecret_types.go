@@ -19,9 +19,9 @@ func init() {
 // ConfigMapSecret holds configuration data with embedded secrets.
 type ConfigMapSecret struct {
 	metav1.TypeMeta `json:",inline"`
+
 	// Standard object metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
-	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
 	// Desired state of the ConfigMapSecret.
@@ -38,9 +38,9 @@ type ConfigMapSecret struct {
 // ConfigMapSecretList contains a list of ConfigMapSecrets.
 type ConfigMapSecretList struct {
 	metav1.TypeMeta `json:",inline"`
+
 	// Standard list metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#lists-and-simple-kinds
-	// +optional
 	metav1.ListMeta `json:"metadata,omitempty"`
 
 	// List of ConfigMapSecrets.
@@ -50,16 +50,15 @@ type ConfigMapSecretList struct {
 // ConfigMapSecretSpec defines the desired state of a ConfigMapSecret.
 type ConfigMapSecretSpec struct {
 	// Template that describes the config that will be rendered.
+	//
 	// Variable references $(VAR_NAME) in template data are expanded using the
 	// ConfigMapSecret's variables. If a variable cannot be resolved, the reference
 	// in the input data will be unchanged. The $(VAR_NAME) syntax can be escaped
 	// with a double $$, ie: $$(VAR_NAME). Escaped references will never be expanded,
 	// regardless of whether the variable exists or not.
-	// +optional
 	Template ConfigMapTemplate `json:"template,omitempty"`
 
 	// List of template variables.
-	// +optional
 	Vars []TemplateVariable `json:"vars,omitempty"`
 }
 
@@ -68,7 +67,6 @@ type ConfigMapTemplate struct {
 	// Metadata is a stripped down version of the standard object metadata.
 	// Its properties will be applied to the metadata of the generated Secret.
 	// If no name is provided, the name of the ConfigMapSecret will be used.
-	// +optional
 	Metadata TemplateMetadata `json:"metadata,omitempty"`
 
 	// Data contains the configuration data.
@@ -76,7 +74,6 @@ type ConfigMapTemplate struct {
 	// Values with non-UTF-8 byte sequences must use the BinaryData field.
 	// The keys stored in Data must not overlap with the keys in
 	// the BinaryData field.
-	// +optional
 	Data map[string]string `json:"data,omitempty"`
 
 	// BinaryData contains the binary data.
@@ -84,7 +81,6 @@ type ConfigMapTemplate struct {
 	// BinaryData can contain byte sequences that are not in the UTF-8 range.
 	// The keys stored in BinaryData must not overlap with the keys in
 	// the Data field.
-	// +optional
 	BinaryData map[string][]byte `json:"binaryData,omitempty"`
 }
 
@@ -95,21 +91,18 @@ type TemplateMetadata struct {
 	// automatically. Name is primarily intended for creation idempotence and configuration
 	// definition.
 	// More info: http://kubernetes.io/docs/user-guide/identifiers#names
-	// +optional
 	Name string `json:"name,omitempty"`
 
 	// Map of string keys and values that can be used to organize and categorize
 	// (scope and select) objects. May match selectors of replication controllers
 	// and services.
 	// More info: http://kubernetes.io/docs/user-guide/labels
-	// +optional
 	Labels map[string]string `json:"labels,omitempty"`
 
 	// Annotations is an unstructured key value map stored with a resource that may be
 	// set by external tools to store and retrieve arbitrary metadata. They are not
 	// queryable and should be preserved when modifying objects.
 	// More info: http://kubernetes.io/docs/user-guide/annotations
-	// +optional
 	Annotations map[string]string `json:"annotations,omitempty"`
 }
 
@@ -123,28 +116,27 @@ type TemplateVariable struct {
 	// the reference in the input string will be unchanged. The $(VAR_NAME) syntax
 	// can be escaped with a double $$, ie: $$(VAR_NAME). Escaped references will
 	// never be expanded, regardless of whether the variable exists or not.
+	//
 	// Defaults to "".
-	// +optional
 	Value string `json:"value,omitempty"`
+
 	// SecretValue selects a value by its key in a Secret.
-	// +optional
 	SecretValue *corev1.SecretKeySelector `json:"secretValue,omitempty"`
+
 	// ConfigMapValue selects a value by its key in a ConfigMap.
-	// +optional
 	ConfigMapValue *corev1.ConfigMapKeySelector `json:"configMapValue,omitempty"`
 }
 
 // ConfigMapSecretStatus describes the observed state of a ConfigMapSecret.
 type ConfigMapSecretStatus struct {
 	// The generation observed by the ConfigMapSecret controller.
-	// +optional
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 
 	// Represents the latest available observations of a ConfigMapSecret's current state.
+	//
 	// +listType=map
 	// +listMapKey=type
 	// +listMapKeys=type
-	// +optional
 	Conditions []ConfigMapSecretCondition `json:"conditions,omitempty"`
 }
 
@@ -152,19 +144,20 @@ type ConfigMapSecretStatus struct {
 type ConfigMapSecretCondition struct {
 	// Type of the condition.
 	Type ConfigMapSecretConditionType `json:"type"`
+
 	// Status of the condition: True, False, or Unknown.
 	Status corev1.ConditionStatus `json:"status"`
+
 	// The last time the condition was updated.
-	// +optional
 	LastUpdateTime metav1.Time `json:"lastUpdateTime,omitempty"`
+
 	// Last time the condition transitioned from one status to another.
-	// +optional
 	LastTransitionTime metav1.Time `json:"lastTransitionTime,omitempty"`
+
 	// The reason for the last update.
-	// +optional
 	Reason string `json:"reason,omitempty"`
+
 	// A human readable message indicating details about the last update.
-	// +optional
 	Message string `json:"message,omitempty"`
 }
 

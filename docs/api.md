@@ -66,7 +66,7 @@ ConfigMapSecretSpec defines the desired state of a ConfigMapSecret.
 
 | Field | Description | Type | Required |
 | ----- | ----------- | ---- | -------- |
-| template | Template that describes the config that will be rendered. Variable references $(VAR_NAME) in template data are expanded using the ConfigMapSecret's variables. If a variable cannot be resolved, the reference in the input data will be unchanged. The $(VAR_NAME) syntax can be escaped with a double $$, ie: $$(VAR_NAME). Escaped references will never be expanded, regardless of whether the variable exists or not. | [ConfigMapTemplate](#configmaptemplate) | false |
+| template | Template that describes the config that will be rendered.<br/><br/>Variable references $(VAR_NAME) in template data are expanded using the ConfigMapSecret's variables. If a variable cannot be resolved, the reference in the input data will be unchanged. The $(VAR_NAME) syntax can be escaped with a double $$, ie: $$(VAR_NAME). Escaped references will never be expanded, regardless of whether the variable exists or not. | [ConfigMapTemplate](#configmaptemplate) | false |
 | vars | List of template variables. | [][TemplateVariable](#templatevariable) | false |
 
 [Back to TOC](#table-of-contents)
@@ -113,7 +113,7 @@ TemplateVariable is a template variable.
 | Field | Description | Type | Required |
 | ----- | ----------- | ---- | -------- |
 | name | Name of the template variable. | string | true |
-| value | Variable references $(VAR_NAME) are expanded using the previous defined environment variables in the ConfigMapSecret. If a variable cannot be resolved, the reference in the input string will be unchanged. The $(VAR_NAME) syntax can be escaped with a double $$, ie: $$(VAR_NAME). Escaped references will never be expanded, regardless of whether the variable exists or not. Defaults to \"\". | string | false |
+| value | Variable references $(VAR_NAME) are expanded using the previous defined environment variables in the ConfigMapSecret. If a variable cannot be resolved, the reference in the input string will be unchanged. The $(VAR_NAME) syntax can be escaped with a double $$, ie: $$(VAR_NAME). Escaped references will never be expanded, regardless of whether the variable exists or not.<br/><br/>Defaults to \"\". | string | false |
 | secretValue | SecretValue selects a value by its key in a Secret. | *[corev1.SecretKeySelector](https://pkg.go.dev/k8s.io/api/core/v1#SecretKeySelector) | false |
 | configMapValue | ConfigMapValue selects a value by its key in a ConfigMap. | *[corev1.ConfigMapKeySelector](https://pkg.go.dev/k8s.io/api/core/v1#ConfigMapKeySelector) | false |
 

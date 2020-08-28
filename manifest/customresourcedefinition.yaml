@@ -33,7 +33,7 @@ spec:
             description: 'Desired state of the ConfigMapSecret. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status'
             properties:
               template:
-                description: 'Template that describes the config that will be rendered. Variable references $(VAR_NAME) in template data are expanded using the ConfigMapSecret''s variables. If a variable cannot be resolved, the reference in the input data will be unchanged. The $(VAR_NAME) syntax can be escaped with a double $$, ie: $$(VAR_NAME). Escaped references will never be expanded, regardless of whether the variable exists or not.'
+                description: "Template that describes the config that will be rendered. \n Variable references $(VAR_NAME) in template data are expanded using the ConfigMapSecret's variables. If a variable cannot be resolved, the reference in the input data will be unchanged. The $(VAR_NAME) syntax can be escaped with a double $$, ie: $$(VAR_NAME). Escaped references will never be expanded, regardless of whether the variable exists or not."
                 properties:
                   binaryData:
                     additionalProperties:
@@ -103,7 +103,7 @@ spec:
                       - key
                       type: object
                     value:
-                      description: 'Variable references $(VAR_NAME) are expanded using the previous defined environment variables in the ConfigMapSecret. If a variable cannot be resolved, the reference in the input string will be unchanged. The $(VAR_NAME) syntax can be escaped with a double $$, ie: $$(VAR_NAME). Escaped references will never be expanded, regardless of whether the variable exists or not. Defaults to "".'
+                      description: "Variable references $(VAR_NAME) are expanded using the previous defined environment variables in the ConfigMapSecret. If a variable cannot be resolved, the reference in the input string will be unchanged. The $(VAR_NAME) syntax can be escaped with a double $$, ie: $$(VAR_NAME). Escaped references will never be expanded, regardless of whether the variable exists or not. \n Defaults to \"\"."
                       type: string
                   required:
                   - name
