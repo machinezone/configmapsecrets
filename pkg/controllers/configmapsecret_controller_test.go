@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/onsi/gomega" // TODO: remove gomega
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 
@@ -1164,9 +1163,9 @@ func TestReconciler(t *testing.T) {
 func createConfigMapSecretStep(obj *v1alpha1.ConfigMapSecret) step {
 	return func(ctx context.Context, t *testing.T, r *testReconciler) {
 		t.Run("create-configmapsecret", func(t *testing.T) {
-			g := gomega.NewWithT(t)
-			err := r.api.Create(ctx, obj)
-			g.Expect(err).NotTo(gomega.HaveOccurred(), "Create ConfigMapSecret")
+			if err := r.api.Create(ctx, obj); err != nil {
+				t.Fatalf("failed to create: %v", err)
+			}
 		})
 	}
 }
@@ -1174,15 +1173,19 @@ func createConfigMapSecretStep(obj *v1alpha1.ConfigMapSecret) step {
 func updateConfigMapSecretStep(key types.NamespacedName, fn func(obj *v1alpha1.ConfigMapSecret)) step {
 	return func(ctx context.Context, t *testing.T, r *testReconciler) {
 		t.Run("update-configmapsecret", func(t *testing.T) {
-			g := gomega.NewWithT(t)
 			for {
 				obj := &v1alpha1.ConfigMapSecret{}
-				g.Expect(r.api.Get(ctx, key, obj)).NotTo(gomega.HaveOccurred(), "Get ConfigMapSecret")
-				fn(obj)
-				if err := r.api.Update(ctx, obj); !errors.IsConflict(err) {
-					g.Expect(err).NotTo(gomega.HaveOccurred(), "Update ConfigMapSecret")
-					return
+				if err := r.api.Get(ctx, key, obj); err != nil {
+					t.Fatalf("failed to get: %v", err)
 				}
+				fn(obj)
+				if err := r.api.Update(ctx, obj); err != nil {
+					if errors.IsConflict(err) {
+						continue
+					}
+					t.Fatalf("failed to update: %v", err)
+				}
+				return
 			}
 		})
 	}
@@ -1201,15 +1204,25 @@ func checkStatusStep(ok bool, key types.NamespacedName) step {
 					t.Fatalf("ObservedGeneration doesn't match Generation; %d != %d", obs, gen)
 				}
 			})
-			g := gomega.NewWithT(t)
-			g.Expect(obj.Status.Conditions).To(gomega.HaveLen(1), "Conditions")
-			cond := obj.Status.Conditions[0]
-			g.Expect(cond.Type).To(gomega.Equal(v1alpha1.ConfigMapSecretRenderFailure), "Condition Type")
+			stat := obj.Status
+			if want, got := 1, len(stat.Conditions); want != got {
+				t.Fatalf("unexpected number of conditions; want: %d; got: %d", want, got)
+			}
+			cond := stat.Conditions[0]
+			if want, got := v1alpha1.ConfigMapSecretRenderFailure, cond.Type; want != got {
+				t.Fatalf("unexpected condition type; want: %q; got: %q", want, got)
+			}
 			if ok {
-				g.Expect(cond.Status).To(gomega.Equal(corev1.ConditionFalse), "Condition Status")
+				if want, got := corev1.ConditionFalse, cond.Status; want != got {
+					t.Fatalf("unexpected condition status; want: %q; got: %q", want, got)
+				}
 			} else {
-				g.Expect(cond.Status).To(gomega.Equal(corev1.ConditionTrue), "Condition Status")
-				g.Expect(cond.Reason).To(gomega.Equal(CreateVariablesErrorReason), "Condition Reason")
+				if want, got := corev1.ConditionTrue, cond.Status; want != got {
+					t.Fatalf("unexpected condition status; want: %q; got: %q", want, got)
+				}
+				if want, got := CreateVariablesErrorReason, cond.Reason; want != got {
+					t.Fatalf("unexpected condition reason; want: %q; got: %q", want, got)
+				}
 			}
 		})
 	}
@@ -1218,9 +1231,9 @@ func checkStatusStep(ok bool, key types.NamespacedName) step {
 func createConfigMapStep(obj *corev1.ConfigMap) step {
 	return func(ctx context.Context, t *testing.T, r *testReconciler) {
 		t.Run("create-configmap", func(t *testing.T) {
-			g := gomega.NewWithT(t)
-			err := r.api.Create(ctx, obj)
-			g.Expect(err).NotTo(gomega.HaveOccurred(), "Create ConfigMap")
+			if err := r.api.Create(ctx, obj); err != nil {
+				t.Fatalf("failed to create: %v", err)
+			}
 		})
 	}
 }
@@ -1228,15 +1241,19 @@ func createConfigMapStep(obj *corev1.ConfigMap) step {
 func updateConfigMapStep(key types.NamespacedName, fn func(obj *corev1.ConfigMap)) step {
 	return func(ctx context.Context, t *testing.T, r *testReconciler) {
 		t.Run("update-configmap", func(t *testing.T) {
-			g := gomega.NewWithT(t)
 			for {
 				obj := &corev1.ConfigMap{}
-				g.Expect(r.api.Get(ctx, key, obj)).NotTo(gomega.HaveOccurred(), "Get ConfigMap")
-				fn(obj)
-				if err := r.api.Update(ctx, obj); !errors.IsConflict(err) {
-					g.Expect(err).NotTo(gomega.HaveOccurred(), "Update ConfigMap")
-					return
+				if err := r.api.Get(ctx, key, obj); err != nil {
+					t.Fatalf("failed to get: %v", err)
 				}
+				fn(obj)
+				if err := r.api.Update(ctx, obj); err != nil {
+					if errors.IsConflict(err) {
+						continue
+					}
+					t.Fatalf("failed to update: %v", err)
+				}
+				return
 			}
 		})
 	}
@@ -1245,14 +1262,15 @@ func updateConfigMapStep(key types.NamespacedName, fn func(obj *corev1.ConfigMap
 func deleteConfigMapStep(key types.NamespacedName) step {
 	return func(ctx context.Context, t *testing.T, r *testReconciler) {
 		t.Run("delete-configmap", func(t *testing.T) {
-			g := gomega.NewWithT(t)
-			err := r.api.Delete(ctx, &corev1.ConfigMap{
+			obj := &corev1.ConfigMap{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: key.Namespace,
 					Name:      key.Name,
 				},
-			})
-			g.Expect(err).NotTo(gomega.HaveOccurred(), "Delete ConfigMap")
+			}
+			if err := r.api.Delete(ctx, obj); err != nil {
+				t.Fatalf("failed to delete: %v", err)
+			}
 		})
 	}
 }
@@ -1260,25 +1278,29 @@ func deleteConfigMapStep(key types.NamespacedName) step {
 func createSecretStep(obj *corev1.Secret) step {
 	return func(ctx context.Context, t *testing.T, r *testReconciler) {
 		t.Run("create-secret", func(t *testing.T) {
-			g := gomega.NewWithT(t)
-			err := r.api.Create(ctx, obj)
-			g.Expect(err).NotTo(gomega.HaveOccurred(), "Create Secret")
+			if err := r.api.Create(ctx, obj); err != nil {
+				t.Fatalf("failed to create: %v", err)
+			}
 		})
 	}
 }
 
 func updateSecretStep(key types.NamespacedName, fn func(obj *corev1.Secret)) step {
 	return func(ctx context.Context, t *testing.T, r *testReconciler) {
-		t.Run("update-secret", func(t *testing.T) {
-			g := gomega.NewWithT(t)
+		t.Run("update-configmap", func(t *testing.T) {
 			for {
 				obj := &corev1.Secret{}
-				g.Expect(r.api.Get(ctx, key, obj)).NotTo(gomega.HaveOccurred(), "Get Secret")
-				fn(obj)
-				if err := r.api.Update(ctx, obj); !errors.IsConflict(err) {
-					g.Expect(err).NotTo(gomega.HaveOccurred(), "Update Secret")
-					return
+				if err := r.api.Get(ctx, key, obj); err != nil {
+					t.Fatalf("failed to get: %v", err)
 				}
+				fn(obj)
+				if err := r.api.Update(ctx, obj); err != nil {
+					if errors.IsConflict(err) {
+						continue
+					}
+					t.Fatalf("failed to update: %v", err)
+				}
+				return
 			}
 		})
 	}
@@ -1287,14 +1309,15 @@ func updateSecretStep(key types.NamespacedName, fn func(obj *corev1.Secret)) ste
 func deleteSecretStep(key types.NamespacedName) step {
 	return func(ctx context.Context, t *testing.T, r *testReconciler) {
 		t.Run("delete-secret", func(t *testing.T) {
-			g := gomega.NewWithT(t)
-			err := r.api.Delete(ctx, &corev1.Secret{
+			obj := &corev1.Secret{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: key.Namespace,
 					Name:      key.Name,
 				},
-			})
-			g.Expect(err).NotTo(gomega.HaveOccurred(), "Delete Secret")
+			}
+			if err := r.api.Delete(ctx, obj); err != nil {
+				t.Fatalf("failed to delete: %v", err)
+			}
 		})
 	}
 }

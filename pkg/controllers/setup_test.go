@@ -15,7 +15,6 @@ import (
 	"github.com/go-logr/zapr"
 	"github.com/machinezone/configmapsecrets/pkg/api/v1alpha1"
 	"github.com/machinezone/configmapsecrets/pkg/mzlog"
-	"github.com/onsi/gomega" // TODO: remove gomega
 	"go.uber.org/zap/zapcore"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -75,20 +74,22 @@ type testReconciler struct {
 }
 
 func newTestReconciler(t *testing.T) *testReconciler {
-	g := gomega.NewWithT(t)
 	ctx, cancel := context.WithCancel(context.TODO())
 	mgr, err := manager.New(cfg, manager.Options{
 		Scheme: scheme,
 		Logger: nil,
 	})
-	g.Expect(err).NotTo(gomega.HaveOccurred())
-
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 	// bypass cache for test verification
 	api, err := client.New(mgr.GetConfig(), client.Options{
 		Scheme: mgr.GetScheme(),
 		Mapper: mgr.GetRESTMapper(),
 	})
-	g.Expect(err).NotTo(gomega.HaveOccurred())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 
 	r := &testReconciler{
 		cancel:  cancel,
@@ -98,7 +99,9 @@ func newTestReconciler(t *testing.T) *testReconciler {
 		waiters: make(map[types.NamespacedName]chan struct{}),
 	}
 	rec := ConfigMapSecret{testNotifyFn: r.notify}
-	g.Expect(rec.SetupWithManager(mgr)).NotTo(gomega.HaveOccurred())
+	if err := rec.SetupWithManager(mgr); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 
 	go func() {
 		defer close(r.closed)
@@ -111,8 +114,9 @@ func newTestReconciler(t *testing.T) *testReconciler {
 func (r *testReconciler) close(t *testing.T) {
 	r.cancel()
 	<-r.closed
-	g := gomega.NewWithT(t)
-	g.Expect(r.err).NotTo(gomega.HaveOccurred())
+	if r.err != nil {
+		t.Fatalf("unexpected error: %v", r.err)
+	}
 }
 
 func (r *testReconciler) waiter(key types.NamespacedName) chan struct{} {
