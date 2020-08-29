@@ -145,32 +145,37 @@ func (r *testReconciler) wait(key types.NamespacedName) <-chan struct{} {
 type T interface {
 	Errorf(format string, args ...interface{})
 	Fatalf(format string, args ...interface{})
+	Failed() bool
+	FailNow()
 }
 
-func eventually(t *testing.T, timeout time.Duration, wait <-chan struct{}, test func(t T)) {
+func eventually(t *testing.T, timeout time.Duration, retry <-chan struct{}, test func(t T)) {
+	timer := time.NewTimer(timeout)
+	defer timer.Stop()
+
 	for {
-		// only final test if succeeds or panics
+		// run test
 		s := &stubT{}
 		func() {
 			defer func() {
 				if v := recover(); v != nil {
-					if x, _ := v.(*stubT); x != s {
-						panic(v) // real panic
+					if x, _ := v.(*stubT); x == s {
+						return // fatal error in test
 					}
+					panic(v) // panic in test
 				}
 			}()
 			test(s)
 		}()
-		if !s.fail {
-			return // success
+		if !s.failed {
+			return // PASS
 		}
 
-		timer := time.NewTimer(timeout)
 		select {
-		case <-wait:
-			timer.Stop()
+		case <-retry:
+			// run test again
 		case <-timer.C:
-			// final test: succeed or fail
+			// timed out: run final test and let it PASS or FAIL
 			test(t)
 			return
 		}
@@ -178,14 +183,21 @@ func eventually(t *testing.T, timeout time.Duration, wait <-chan struct{}, test 
 }
 
 type stubT struct {
-	fail bool
+	failed bool
 }
 
 func (t *stubT) Errorf(format string, args ...interface{}) {
-	t.fail = true
+	t.failed = true
 }
 
 func (t *stubT) Fatalf(format string, args ...interface{}) {
 	t.Errorf(format, args...)
+	t.FailNow()
+}
+
+func (t *stubT) Failed() bool { return t.failed }
+
+func (t *stubT) FailNow() {
+	t.failed = true
 	panic(t)
 }

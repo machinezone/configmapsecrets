@@ -1194,17 +1194,17 @@ func updateConfigMapSecretStep(key types.NamespacedName, fn func(obj *v1alpha1.C
 func checkStatusStep(ok bool, key types.NamespacedName) step {
 	return func(ctx context.Context, t *testing.T, r *testReconciler) {
 		t.Run("check-status", func(t *testing.T) {
-			var obj v1alpha1.ConfigMapSecret
+			var cms v1alpha1.ConfigMapSecret
 			eventually(t, timeout, r.wait(key), func(t T) {
-				obj = v1alpha1.ConfigMapSecret{} // reset
-				if err := r.api.Get(ctx, key, &obj); err != nil {
+				cms = v1alpha1.ConfigMapSecret{} // reset
+				if err := r.api.Get(ctx, key, &cms); err != nil {
 					t.Fatalf("failed to get ConfigMapSecret: %v", err)
 				}
-				if gen, obs := obj.Generation, obj.Status.ObservedGeneration; gen != obs {
+				if gen, obs := cms.Generation, cms.Status.ObservedGeneration; gen != obs {
 					t.Fatalf("ObservedGeneration doesn't match Generation; %d != %d", obs, gen)
 				}
 			})
-			stat := obj.Status
+			stat := cms.Status
 			if want, got := 1, len(stat.Conditions); want != got {
 				t.Fatalf("unexpected number of conditions; want: %d; got: %d", want, got)
 			}
@@ -1341,6 +1341,9 @@ func checkSecretStep(want *corev1.Secret) step {
 				}
 				if diff := cmp.Diff(want.Data, got.Data, bytesToString); diff != "" {
 					t.Errorf("unexpected data diff:\n\n%v", diff)
+				}
+				if t.Failed() {
+					t.FailNow()
 				}
 			})
 		})
