@@ -20,12 +20,14 @@ import (
 	"net/url"
 	"path"
 	"reflect"
+	"regexp"
 	"sort"
-	"strconv"
 	"strings"
 	"unicode"
 	"unicode/utf8"
 
+	"github.com/machinezone/configmapsecrets/pkg/genapi/internal"
+	"github.com/machinezone/configmapsecrets/pkg/genapi/internal/jsontags"
 	"golang.org/x/tools/go/packages"
 )
 
@@ -89,33 +91,35 @@ func mdSectionLink(name string) string {
 	return fmt.Sprintf("[%s](#%s)", name, link)
 }
 
-func mdType(pkg *Package, typ ast.Expr) string {
-	switch e := typ.(type) {
-	case *ast.Ident:
-		if _, ok := pkg.Structs[e.Name]; ok {
-			return mdSectionLink(e.Name)
+func mdType(pkg *Package, typ types.Type) string {
+	switch t := typ.(type) {
+	case *types.Basic:
+		return t.String()
+	case *types.Pointer:
+		return "*" + mdType(pkg, t.Elem())
+	case *types.Slice:
+		return "[]" + mdType(pkg, t.Elem())
+	case *types.Array:
+		return fmt.Sprintf("[%d]%s", t.Len(), mdType(pkg, t.Elem()))
+	case *types.Map:
+		return "map[" + mdType(pkg, t.Key()) + "]" + mdType(pkg, t.Elem())
+	case *types.Named:
+		name := t.Obj().Name()
+		switch pkgPath := t.Obj().Pkg().Path(); pkgPath {
+		case pkg.Pkg.PkgPath:
+			if _, ok := pkg.Structs[name]; ok {
+				return mdSectionLink(name)
+			}
+			if _, ok := pkg.Constants[name]; ok {
+				return mdSectionLink(name)
+			}
+			return name
+		default:
+			text := packageIdent(pkgPath) + "." + name
+			return fmt.Sprintf("[%s](https://pkg.go.dev/%s#%s)", text, pkgPath, name)
 		}
-		if _, ok := pkg.Constants[e.Name]; ok {
-			return mdSectionLink(e.Name)
-		}
-		return e.Name
-	case *ast.SelectorExpr:
-		pkgID := e.X.(*ast.Ident).String()
-		typID := e.Sel.Name
-		text := pkgID + "." + typID
-		if path, ok := importPath(pkg, typ, pkgID); ok {
-			// https://pkg.go.dev/k8s.io/apimachinery/pkg/apis/meta/v1#ObjectMeta
-			return fmt.Sprintf("[%s](https://pkg.go.dev/%s#%s)", text, path, typID)
-		}
-		return text
-	case *ast.StarExpr:
-		return "*" + mdType(pkg, e.X)
-	case *ast.ArrayType:
-		return "[]" + mdType(pkg, e.Elt)
-	case *ast.MapType:
-		return "map[" + mdType(pkg, e.Key) + "]" + mdType(pkg, e.Value)
 	default:
-		return ""
+		return "???"
 	}
 }
 
@@ -131,21 +135,20 @@ func sortedNames(pkg *Package) []string {
 	return names
 }
 
-func importPath(pkg *Package, exp ast.Expr, pkgID string) (string, bool) {
-	file, ok := pkg.AstPkg.Files[pkg.FileSet.Position(exp.Pos()).Filename]
-	if !ok {
-		return "", false
+func packageIdent(pkg string) string {
+	base := path.Base(pkg)
+	parent := path.Base(path.Dir(pkg))
+	if !isVersion(base) || parent == "." || parent == ".." || parent == "/" {
+		return base
 	}
-	for _, i := range file.Imports {
-		if i.Name != nil {
-			if i.Name.Name == pkgID {
-				return unquote(i.Path.Value), true
-			}
-		} else if path.Base(i.Path.Value) == pkgID {
-			return unquote(i.Path.Value), true
-		}
-	}
-	return "", false
+	return parent + base
+}
+
+var versionRE = regexp.MustCompile("^v([0-9]+)((alpha|beta)([0-9]+))?$")
+
+// isVersion returns a value indicating whether s is a version string.
+func isVersion(s string) bool {
+	return versionRE.MatchString(s)
 }
 
 // A Package represents a package.
@@ -161,65 +164,52 @@ type Package struct {
 
 // ParsePackage parses the package in the given path.
 func ParsePackage(path string) (*Package, error) {
-	cfg := &packages.Config{
-		Mode: packages.NeedSyntax | packages.NeedTypes | packages.NeedDeps | packages.NeedImports, // | packages.NeedTypesInfo,
-		Fset: token.NewFileSet(),
-	}
-	pkgs, err := packages.Load(cfg, path)
+	fset := token.NewFileSet()
+	pkg, pkgs, err := internal.LoadPackage(path, fset)
 	if err != nil {
 		return nil, err
 	}
-	if len(pkgs) != 1 {
-		return nil, fmt.Errorf("expected 1 package, found %d", len(pkgs))
-	}
-	if len(pkgs[0].Errors) > 0 {
-		return nil, pkgs[0].Errors[0]
-	}
-	pkg := pkgs[0]
-	astPkg := &ast.Package{
-		Name:  path,
-		Files: make(map[string]*ast.File),
-		Scope: ast.NewScope(nil),
-	}
-	for _, file := range pkg.Syntax {
-		name := pkg.Fset.File(file.Package).Name()
-		astPkg.Files[name] = file
-		for _, obj := range file.Scope.Objects {
-			astPkg.Scope.Insert(obj)
-		}
-	}
-	p := &Package{
-		FileSet:   cfg.Fset,
-		Pkg:       pkg,
-		AstPkg:    astPkg,
-		DocPkg:    doc.New(astPkg, "", 0),
-		Constants: make(map[string]Constant),
-		Structs:   make(map[string]Struct),
-	}
+
 	// Constants are not necessarily associated with their type.
 	// They may be associated with another type or the package.
-	scope := pkg.Types.Scope()
-	consts := constValues(scope, p.DocPkg.Consts)
-	for _, typ := range p.DocPkg.Types {
-		if len(typ.Consts) == 0 {
+	scope := pkg.Pkg.Types.Scope()
+	consts := constValues(scope, pkg.DocPkg.Consts)
+	for _, docType := range pkg.DocPkg.Types {
+		if len(docType.Consts) == 0 {
 			continue
 		}
-		for typName, vals := range constValues(scope, typ.Consts) {
-			consts[typName] = append(consts[typName], vals...)
+		for typesType, vals := range constValues(scope, docType.Consts) {
+			consts[typesType] = append(consts[typesType], vals...)
 		}
 	}
-	for _, dt := range p.DocPkg.Types {
-		if vals, ok := consts[scope.Lookup(dt.Name).Type()]; ok {
-			p.Constants[dt.Name] = Constant{
-				Doc:    fmtRawDoc(dt.Doc),
-				Name:   dt.Name,
+	constants := make(map[string]Constant)
+	for name, typ := range pkg.Basics {
+		if vals, ok := consts[typ.Named]; ok {
+			constants[name] = Constant{
+				Doc:    fmtRawDoc(typ.DocType.Doc),
+				Name:   typ.DocType.Name,
 				Values: vals,
 			}
-		} else if st, ok := dt.Decl.Specs[0].(*ast.TypeSpec).Type.(*ast.StructType); ok {
-			p.Structs[dt.Name] = newStruct(dt, st)
 		}
 	}
-	return p, nil
+
+	structs := make(map[string]Struct)
+	for name, typ := range pkg.Structs {
+		structs[name] = Struct{
+			Name:   typ.DocType.Name,
+			Doc:    fmtRawDoc(typ.DocType.Doc),
+			Fields: structFields(pkgs, typ),
+		}
+	}
+
+	return &Package{
+		FileSet:   fset,
+		Pkg:       pkg.Pkg,
+		AstPkg:    pkg.AstPkg,
+		DocPkg:    pkg.DocPkg,
+		Constants: constants,
+		Structs:   structs,
+	}, nil
 }
 
 // A Constant represents a constant.
@@ -236,8 +226,8 @@ type Value struct {
 	Value constant.Value
 }
 
-func constValues(scope *types.Scope, consts []*doc.Value) map[types.Type][]Value {
-	cvs := make(map[types.Type][]Value)
+func constValues(scope *types.Scope, consts []*doc.Value) map[*types.Named][]Value {
+	cvs := make(map[*types.Named][]Value)
 	for _, v := range consts {
 		docWrap := fmtRawDoc(v.Doc)
 		for _, s := range v.Decl.Specs {
@@ -251,7 +241,7 @@ func constValues(scope *types.Scope, consts []*doc.Value) map[types.Type][]Value
 			}
 			for _, n := range spec.Names {
 				obj := scope.Lookup(n.Name)
-				typ := obj.Type()
+				typ := obj.Type().(*types.Named)
 				cvs[typ] = append(cvs[typ], Value{
 					Doc:   doc,
 					Name:  n.Name,
@@ -270,83 +260,52 @@ type Struct struct {
 	Fields []Field
 }
 
-func newStruct(dt *doc.Type, st *ast.StructType) Struct {
-	s := Struct{
-		Name: dt.Name,
-		Doc:  fmtRawDoc(dt.Doc),
-	}
-	for _, v := range st.Fields.List {
-		if f, ok := newField(v); ok {
-			s.Fields = append(s.Fields, f)
-		}
-	}
-	return s
-}
-
 // A Field represents a struct field.
 type Field struct {
 	Name     string
 	Doc      string
-	Type     ast.Expr
+	Type     types.Type
 	Required bool
 }
 
-func newField(f *ast.Field) (Field, bool) {
-	// TODO: Do we care about multi-field lines? We only take the first one.
-	// type Foo struct {
-	//  Bar, Baz string  // Baz is dropped
-	// }
-	name, opts := jsonTag(f.Tag)
-	if containsString(opts, "inline") {
-		return Field{}, false
-	}
-	if name == "" {
-		if len(f.Names) == 0 {
-			name = f.Type.(*ast.Ident).Name // embedded
-		} else {
-			name = f.Names[0].Name
+func structFields(pkgs map[string]*internal.Package, s *internal.Struct) []Field {
+	var list []Field
+	for i, n := 0, s.Struct.NumFields(); i < n; i++ {
+		f := s.Struct.Field(i)
+		if !f.Exported() {
+			continue
 		}
-	}
-	required := true
-	if containsString(opts, "omitempty") ||
-		(f.Doc != nil && hasComment(f.Doc.List, "+optional")) {
-		required = false
-	}
-	return Field{
-		Name:     name,
-		Doc:      fmtRawDoc(f.Doc.Text()),
-		Type:     f.Type,
-		Required: required,
-	}, true
-}
-
-func unquote(s string) string {
-	v, err := strconv.Unquote(s)
-	if err != nil {
-		return s
-	}
-	return v
-}
-
-func jsonTag(tag *ast.BasicLit) (name string, opts []string) {
-	if tag == nil {
-		return "", nil
-	}
-	opts = strings.Split(reflect.StructTag(unquote(tag.Value)).Get("json"), ",")
-	return opts[0], opts[1:]
-}
-
-func containsString(haystack []string, needle string) bool {
-	for _, s := range haystack {
-		if s == needle {
-			return true
+		doc := s.FieldDoc(f.Name())
+		tag := jsontags.Parse(reflect.StructTag(s.Struct.Tag(i)).Get("json"))
+		if tag.Contains("inline") {
+			o := f.Type().(*types.Named).Obj()
+			s := pkgs[o.Pkg().Path()].Structs[o.Name()]
+			list = append(list, structFields(pkgs, s)...)
+			continue
 		}
+		name := tag.Name
+		if name == "" {
+			name = f.Name()
+		}
+		required := true
+		if tag.Contains("omitempty") || hasComment(doc, "+optional") {
+			required = false
+		}
+		list = append(list, Field{
+			Name:     name,
+			Doc:      fmtRawDoc(doc.Text()),
+			Type:     f.Type(),
+			Required: required,
+		})
 	}
-	return false
+	return list
 }
 
-func hasComment(comments []*ast.Comment, comment string) bool {
-	for _, s := range comments {
+func hasComment(grp *ast.CommentGroup, comment string) bool {
+	if grp == nil {
+		return false
+	}
+	for _, s := range grp.List {
 		if strings.TrimSpace(s.Text) == comment {
 			return true
 		}
@@ -354,7 +313,7 @@ func hasComment(comments []*ast.Comment, comment string) bool {
 	return false
 }
 
-// fmtRawDoc is copy/pasted from prometheus-operator:
+// fmtRawDoc was originally copy/pasted from prometheus-operator, but has diverged:
 // https://github.com/coreos/prometheus-operator/blob/master/cmd/po-docgen/api.go
 func fmtRawDoc(rawDoc string) string {
 	var buffer bytes.Buffer
