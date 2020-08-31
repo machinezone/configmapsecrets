@@ -284,7 +284,7 @@ func TestReconciler(t *testing.T) {
 								"bar": "bar: $(BAR)",
 							},
 						},
-						Vars: []v1alpha1.TemplateVariable{
+						Vars: []v1alpha1.Var{
 							{
 								Name:  "FOO",
 								Value: "abc",
@@ -321,7 +321,7 @@ func TestReconciler(t *testing.T) {
 								Namespace: "default",
 							},
 							func(obj *v1alpha1.ConfigMapSecret) {
-								obj.Spec.Vars = []v1alpha1.TemplateVariable{
+								obj.Spec.Vars = []v1alpha1.Var{
 									{
 										Name:  "FOO",
 										Value: "abc",
@@ -384,7 +384,7 @@ func TestReconciler(t *testing.T) {
 								"baz": "baz: $(BAZ)",
 							},
 						},
-						Vars: []v1alpha1.TemplateVariable{
+						Vars: []v1alpha1.Var{
 							{
 								Name: "FOO",
 								SecretValue: &corev1.SecretKeySelector{
@@ -594,7 +594,7 @@ func TestReconciler(t *testing.T) {
 								"qux": []byte("$(FOO)"),
 							},
 						},
-						Vars: []v1alpha1.TemplateVariable{
+						Vars: []v1alpha1.Var{
 							{
 								Name: "FOO",
 								ConfigMapValue: &corev1.ConfigMapKeySelector{
@@ -795,7 +795,7 @@ func TestReconciler(t *testing.T) {
 								},
 							},
 						},
-						Vars: []v1alpha1.TemplateVariable{
+						Vars: []v1alpha1.Var{
 							{
 								Name:  "TEST_QUX",
 								Value: "var",
@@ -975,7 +975,7 @@ func TestReconciler(t *testing.T) {
 								},
 							},
 						},
-						Vars: []v1alpha1.TemplateVariable{
+						Vars: []v1alpha1.Var{
 							{
 								Name:  "TEST_QUX",
 								Value: "var",
@@ -1104,7 +1104,7 @@ func TestReconciler(t *testing.T) {
 								"hello": "$(NAME)",
 							},
 						},
-						Vars: []v1alpha1.TemplateVariable{
+						Vars: []v1alpha1.Var{
 							{
 								Name: "NAME",
 								SecretValue: &corev1.SecretKeySelector{

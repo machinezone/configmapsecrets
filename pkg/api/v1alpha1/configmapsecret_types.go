@@ -66,7 +66,7 @@ type ConfigMapSecretSpec struct {
 	VarsFrom []VarsFromSource `json:"varsFrom,omitempty"`
 
 	// List of template variables.
-	Vars []TemplateVariable `json:"vars,omitempty"`
+	Vars []Var `json:"vars,omitempty"`
 }
 
 // ConfigMapTemplate is a ConfigMap template.
@@ -113,8 +113,8 @@ type TemplateMetadata struct {
 	Annotations map[string]string `json:"annotations,omitempty"`
 }
 
-// TemplateVariable is a template variable.
-type TemplateVariable struct {
+// Var is a template variable.
+type Var struct {
 	// Name of the template variable.
 	Name string `json:"name"`
 

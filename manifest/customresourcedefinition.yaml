@@ -67,7 +67,7 @@ spec:
               vars:
                 description: List of template variables.
                 items:
-                  description: TemplateVariable is a template variable.
+                  description: Var is a template variable.
                   properties:
                     configMapValue:
                       description: ConfigMapValue selects a value by its key in a ConfigMap.

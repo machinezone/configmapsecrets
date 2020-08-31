@@ -631,7 +631,7 @@ func toReqs(namespace string, names map[string]bool) []reconcile.Request {
 	return reqs
 }
 
-func varRefs(varsFrom []v1alpha1.VarsFromSource, vars []v1alpha1.TemplateVariable) (secrets, configMaps map[string]bool) {
+func varRefs(varsFrom []v1alpha1.VarsFromSource, vars []v1alpha1.Var) (secrets, configMaps map[string]bool) {
 	addSecret := func(name string) {
 		if secrets == nil {
 			secrets = make(map[string]bool)

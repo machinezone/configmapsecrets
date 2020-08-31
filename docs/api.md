@@ -12,7 +12,7 @@
 * [ConfigMapVarsSource](#configmapvarssource)
 * [SecretVarsSource](#secretvarssource)
 * [TemplateMetadata](#templatemetadata)
-* [TemplateVariable](#templatevariable)
+* [Var](#var)
 * [VarsFromSource](#varsfromsource)
 
 ## ConfigMapSecret
@@ -75,7 +75,7 @@ ConfigMapSecretSpec defines the desired state of a ConfigMapSecret.
 | ----- | ----------- | ---- | -------- |
 | template | Template that describes the config that will be rendered.<br/><br/>Variable references $(VAR_NAME) in template data are expanded using the ConfigMapSecret's variables. If a variable cannot be resolved, the reference in the input data will be unchanged. The $(VAR_NAME) syntax can be escaped with a double $$, ie: $$(VAR_NAME). Escaped references will never be expanded, regardless of whether the variable exists or not. | [ConfigMapTemplate](#configmaptemplate) | false |
 | varsFrom | List of sources to populate template variables. Keys defined in a source must consist of alphanumeric characters, '-', '_' or '.'. When a key exists in multiple sources, the value associated with the last source will take precedence. Values defined by Vars with a duplicate key will take precedence. | [][VarsFromSource](#varsfromsource) | false |
-| vars | List of template variables. | [][TemplateVariable](#templatevariable) | false |
+| vars | List of template variables. | [][Var](#var) | false |
 
 [Back to TOC](#table-of-contents)
 
@@ -136,9 +136,9 @@ TemplateMetadata is a stripped down version of the standard object metadata.
 
 [Back to TOC](#table-of-contents)
 
-## TemplateVariable
+## Var
 
-TemplateVariable is a template variable.
+Var is a template variable.
 
 | Field | Description | Type | Required |
 | ----- | ----------- | ---- | -------- |
