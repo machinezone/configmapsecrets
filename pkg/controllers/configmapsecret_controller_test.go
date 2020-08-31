@@ -74,7 +74,7 @@ func TestReconciler(t *testing.T) {
 					},
 					Spec: v1alpha1.ConfigMapSecretSpec{
 						Template: v1alpha1.ConfigMapTemplate{
-							Metadata: v1alpha1.TemplateMetadata{
+							Metadata: v1alpha1.EmbeddedObjectMeta{
 								Labels: map[string]string{
 									"foo": "bar",
 								},
@@ -106,7 +106,7 @@ func TestReconciler(t *testing.T) {
 								Namespace: "default",
 							},
 							func(obj *v1alpha1.ConfigMapSecret) {
-								obj.Spec.Template.Metadata = v1alpha1.TemplateMetadata{
+								obj.Spec.Template.Metadata = v1alpha1.EmbeddedObjectMeta{
 									Labels: map[string]string{
 										"foo": "abc",
 										"bar": "xyz",
@@ -144,7 +144,7 @@ func TestReconciler(t *testing.T) {
 					},
 					Spec: v1alpha1.ConfigMapSecretSpec{
 						Template: v1alpha1.ConfigMapTemplate{
-							Metadata: v1alpha1.TemplateMetadata{
+							Metadata: v1alpha1.EmbeddedObjectMeta{
 								Annotations: map[string]string{
 									"foo": "bar",
 								},
@@ -176,7 +176,7 @@ func TestReconciler(t *testing.T) {
 								Namespace: "default",
 							},
 							func(obj *v1alpha1.ConfigMapSecret) {
-								obj.Spec.Template.Metadata = v1alpha1.TemplateMetadata{
+								obj.Spec.Template.Metadata = v1alpha1.EmbeddedObjectMeta{
 									Annotations: map[string]string{
 										"foo": "abc",
 										"bar": "xyz",

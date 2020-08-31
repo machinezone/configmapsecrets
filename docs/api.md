@@ -10,8 +10,8 @@
 * [ConfigMapSecretStatus](#configmapsecretstatus)
 * [ConfigMapTemplate](#configmaptemplate)
 * [ConfigMapVarsSource](#configmapvarssource)
+* [EmbeddedObjectMeta](#embeddedobjectmeta)
 * [SecretVarsSource](#secretvarssource)
-* [TemplateMetadata](#templatemetadata)
 * [Var](#var)
 * [VarsFromSource](#varsfromsource)
 
@@ -96,7 +96,7 @@ ConfigMapTemplate is a ConfigMap template.
 
 | Field | Description | Type | Required |
 | ----- | ----------- | ---- | -------- |
-| metadata | Metadata is a stripped down version of the standard object metadata. Its properties will be applied to the metadata of the generated Secret. If no name is provided, the name of the ConfigMapSecret will be used. | [TemplateMetadata](#templatemetadata) | false |
+| metadata | Metadata is a stripped down version of the standard object metadata. Its properties will be applied to the metadata of the generated Secret. If no name is provided, the name of the ConfigMapSecret will be used. | [EmbeddedObjectMeta](#embeddedobjectmeta) | false |
 | data | Data contains the configuration data. Each key must consist of alphanumeric characters, '-', '_' or '.'. Values with non-UTF-8 byte sequences must use the BinaryData field. The keys stored in Data must not overlap with the keys in the BinaryData field. | map[string]string | false |
 | binaryData | BinaryData contains the binary data. Each key must consist of alphanumeric characters, '-', '_' or '.'. BinaryData can contain byte sequences that are not in the UTF-8 range. The keys stored in BinaryData must not overlap with the keys in the Data field. | map[string][]byte | false |
 
@@ -113,6 +113,18 @@ ConfigMapVarsSource selects a ConfigMap to populate template variables with.
 
 [Back to TOC](#table-of-contents)
 
+## EmbeddedObjectMeta
+
+EmbeddedObjectMeta contains a subset of the fields from k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta. Only fields which are relevant to embedded resources are included.
+
+| Field | Description | Type | Required |
+| ----- | ----------- | ---- | -------- |
+| name | Name must be unique within a namespace. Is required when creating resources, although some resources may allow a client to request the generation of an appropriate name automatically. Name is primarily intended for creation idempotence and configuration definition. [More info](https://kubernetes.io/docs/user-guide/identifiers#names). | string | false |
+| labels | Map of string keys and values that can be used to organize and categorize (scope and select) objects. May match selectors of replication controllers and services. [More info](https://kubernetes.io/docs/user-guide/labels). | map[string]string | false |
+| annotations | Annotations is an unstructured key value map stored with a resource that may be set by external tools to store and retrieve arbitrary metadata. They are not queryable and should be preserved when modifying objects. [More info](https://kubernetes.io/docs/user-guide/annotations). | map[string]string | false |
+
+[Back to TOC](#table-of-contents)
+
 ## SecretVarsSource
 
 SecretVarsSource selects a Secret to populate template variables with.
@@ -121,18 +133,6 @@ SecretVarsSource selects a Secret to populate template variables with.
 | ----- | ----------- | ---- | -------- |
 | name | Name of the referent. [More info](https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names). | string | false |
 | optional | Specify whether the Secret must be defined. | *bool | false |
-
-[Back to TOC](#table-of-contents)
-
-## TemplateMetadata
-
-TemplateMetadata is a stripped down version of the standard object metadata.
-
-| Field | Description | Type | Required |
-| ----- | ----------- | ---- | -------- |
-| name | Name must be unique within a namespace. Is required when creating resources, although some resources may allow a client to request the generation of an appropriate name automatically. Name is primarily intended for creation idempotence and configuration definition. [More info](https://kubernetes.io/docs/user-guide/identifiers#names). | string | false |
-| labels | Map of string keys and values that can be used to organize and categorize (scope and select) objects. May match selectors of replication controllers and services. [More info](https://kubernetes.io/docs/user-guide/labels). | map[string]string | false |
-| annotations | Annotations is an unstructured key value map stored with a resource that may be set by external tools to store and retrieve arbitrary metadata. They are not queryable and should be preserved when modifying objects. [More info](https://kubernetes.io/docs/user-guide/annotations). | map[string]string | false |
 
 [Back to TOC](#table-of-contents)
 

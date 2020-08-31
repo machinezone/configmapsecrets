@@ -74,7 +74,7 @@ type ConfigMapTemplate struct {
 	// Metadata is a stripped down version of the standard object metadata.
 	// Its properties will be applied to the metadata of the generated Secret.
 	// If no name is provided, the name of the ConfigMapSecret will be used.
-	Metadata TemplateMetadata `json:"metadata,omitempty"`
+	Metadata EmbeddedObjectMeta `json:"metadata,omitempty"`
 
 	// Data contains the configuration data.
 	// Each key must consist of alphanumeric characters, '-', '_' or '.'.
@@ -91,8 +91,9 @@ type ConfigMapTemplate struct {
 	BinaryData map[string][]byte `json:"binaryData,omitempty"`
 }
 
-// TemplateMetadata is a stripped down version of the standard object metadata.
-type TemplateMetadata struct {
+// EmbeddedObjectMeta contains a subset of the fields from k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta.
+// Only fields which are relevant to embedded resources are included.
+type EmbeddedObjectMeta struct {
 	// Name must be unique within a namespace. Is required when creating resources, although
 	// some resources may allow a client to request the generation of an appropriate name
 	// automatically. Name is primarily intended for creation idempotence and configuration
