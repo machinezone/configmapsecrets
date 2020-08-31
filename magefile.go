@@ -6,6 +6,7 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
+	"hash/fnv"
 	"io"
 	"io/ioutil"
 	"log"
@@ -17,14 +18,12 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"text/template"
 	"time"
 
-	"github.com/machinezone/configmapsecrets/pkg/api/v1alpha1"
-	"github.com/machinezone/configmapsecrets/pkg/genapi"
 	"github.com/magefile/mage/mg"
 	"github.com/magefile/mage/sh"
 	magetarget "github.com/magefile/mage/target"
-	"k8s.io/apimachinery/pkg/runtime"
 )
 
 const (
@@ -438,7 +437,6 @@ func Push() error {
 
 func Generate() error {
 	mg.Deps(generateCode, generateCDRs, generateRBAC, generateDocs)
-
 	return nil
 }
 
@@ -463,20 +461,71 @@ func generateRBAC() error {
 }
 
 func generateDocs() error {
-	pkg, err := genapi.ParsePackage("github.com/machinezone/configmapsecrets/pkg/api/v1alpha1")
+	path, err := genapiCode("github.com/machinezone/configmapsecrets/pkg/api/v1alpha1")
 	if err != nil {
 		return err
 	}
-	buf := bytes.NewBuffer(nil)
-	scheme := runtime.NewScheme()
-	if err := v1alpha1.AddToScheme(scheme); err != nil {
+
+	mg.Deps(generateCode)
+	out, err := sh.Output(mg.GoCmd(), "run", path)
+	if err != nil {
 		return err
 	}
-	if err := genapi.WriteMarkdown(buf, pkg, genapi.WithScheme(scheme)); err != nil {
-		return err
-	}
-	return writeFile("docs/api.md", buf.String())
+	return writeFile("docs/api.md", out)
 }
+
+func genapiCode(pkg string) (string, error) {
+	hash := fnv.New64a()
+	hash.Write([]byte(pkg))
+	base := fmt.Sprintf("main_%0X.go", hash.Sum64())
+	path := cachePath("docs", base)
+	if ok, err := shouldDo(path); !ok {
+		return path, err
+	}
+
+	buf := bytes.NewBuffer(nil)
+	if err := genapiTmpl.Execute(buf, pkg); err != nil {
+		return "", err
+	}
+	return path, writeFile(path, buf.String())
+}
+
+var genapiTmpl = template.Must(template.New("name").Parse(`
+package main
+
+import (
+	"bytes"
+	"fmt"
+	"io"
+	"os"
+
+	"github.com/machinezone/configmapsecrets/pkg/genapi"
+	"k8s.io/apimachinery/pkg/runtime"
+
+	api "{{ . }}"
+)
+
+func main() {
+	pkg, err := genapi.ParsePackage("{{ . }}")
+	check(err)
+
+	scheme := runtime.NewScheme()
+	check(api.AddToScheme(scheme))
+
+	buf := bytes.NewBuffer(nil)
+	check(genapi.WriteMarkdown(buf, pkg, genapi.WithScheme(scheme)))
+
+	_, err = io.Copy(os.Stdout, buf)
+	check(err)
+}
+
+func check(err error) {
+	if err != nil {
+		fmt.Fprint(os.Stderr, err)
+		os.Exit(1)
+	}
+}
+`))
 
 // Removes build artifacts.
 func Clean() error {
