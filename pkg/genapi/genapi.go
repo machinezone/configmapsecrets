@@ -29,14 +29,45 @@ import (
 	"github.com/machinezone/configmapsecrets/pkg/genapi/internal"
 	"github.com/machinezone/configmapsecrets/pkg/genapi/internal/jsontags"
 	"golang.org/x/tools/go/packages"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
+type option struct {
+	scheme *runtime.Scheme
+	types  map[string]schema.GroupVersionKind
+}
+
+// An Option applies an option.
+type Option interface {
+	apply(*option)
+}
+
+type optionFunc func(*option)
+
+func (fn optionFunc) apply(o *option) { fn(o) }
+
+// WithScheme returns an option that sets the scheme.
+func WithScheme(scheme *runtime.Scheme) Option {
+	return optionFunc(func(o *option) {
+		o.scheme = scheme
+		o.types = make(map[string]schema.GroupVersionKind)
+		for gvk, typ := range scheme.AllKnownTypes() {
+			o.types[typ.PkgPath()+"."+typ.Name()] = gvk
+		}
+	})
+}
+
 // WriteMarkdown writes the API of pkg as markdown to w.
-func WriteMarkdown(w io.Writer, pkg *Package) error {
+func WriteMarkdown(w io.Writer, pkg *Package, options ...Option) error {
+	o := &option{}
+	for _, opt := range options {
+		opt.apply(o)
+	}
 	b := bufio.NewWriter(w)
 	printHeader(b)
 	printTOC(b, pkg)
-	printTypes(b, pkg)
+	printTypes(b, pkg, o)
 	return b.Flush()
 }
 
@@ -53,22 +84,32 @@ func printTOC(w io.Writer, pkg *Package) {
 	}
 }
 
-func printTypes(w io.Writer, pkg *Package) {
+func printTypes(w io.Writer, pkg *Package, opt *option) {
 	for _, name := range sortedNames(pkg) {
 		if s, ok := pkg.Structs[name]; ok {
-			printStruct(w, pkg, s)
+			printStruct(w, pkg, s, opt)
 		} else {
 			printConst(w, pkg, pkg.Constants[name])
 		}
 	}
 }
 
-func printStruct(w io.Writer, pkg *Package, s Struct) {
+func printStruct(w io.Writer, pkg *Package, s Struct, opt *option) {
+	gvk, ok := opt.types[s.Type.String()]
 	fmt.Fprintf(w, "\n## %s\n\n%s\n\n", s.Name, s.Doc)
 	fmt.Fprintln(w, "| Field | Description | Type | Required |")
 	fmt.Fprintln(w, "| ----- | ----------- | ---- | -------- |")
 	for _, f := range s.Fields {
-		fmt.Fprintln(w, "|", f.Name, "|", f.Doc, "|", mdType(pkg, f.Type), "|", f.Required, "|")
+		doc := f.Doc
+		if ok {
+			switch f.Name {
+			case "kind":
+				doc = "`" + gvk.Kind + "`"
+			case "apiVersion":
+				doc = "`" + gvk.GroupVersion().String() + "`"
+			}
+		}
+		fmt.Fprintln(w, "|", f.Name, "|", mdDoc(doc), "|", mdType(pkg, f.Type), "|", f.Required, "|")
 	}
 	fmt.Fprintln(w, "")
 	fmt.Fprintln(w, "[Back to TOC](#table-of-contents)")
@@ -79,10 +120,31 @@ func printConst(w io.Writer, pkg *Package, c Constant) {
 	fmt.Fprintln(w, "| Name | Value | Description |")
 	fmt.Fprintln(w, "| ---- | ----- | ----------- |")
 	for _, v := range c.Values {
-		fmt.Fprintln(w, "|", v.Name, "|", constant.Val(v.Value), "|", v.Doc, "|")
+		fmt.Fprintln(w, "|", v.Name, "|", constant.Val(v.Value), "|", mdDoc(v.Doc), "|")
 	}
 	fmt.Fprintln(w, "")
 	fmt.Fprintln(w, "[Back to TOC](#table-of-contents)")
+}
+
+func sortedNames(pkg *Package) []string {
+	var names []string
+	for name := range pkg.Structs {
+		names = append(names, name)
+	}
+	for name := range pkg.Constants {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	return names
+}
+
+func mdDoc(doc string) string {
+	doc = strings.Replace(doc, "\\\"", "\"", -1) // replace user's \" to "
+	doc = strings.Replace(doc, "\"", "\\\"", -1) // Escape "
+	doc = strings.Replace(doc, "\n", "<br/>", -1)
+	doc = strings.Replace(doc, "\t", "\\t", -1)
+	doc = strings.Replace(doc, "|", "\\|", -1)
+	return strings.TrimSpace(doc)
 }
 
 func mdSectionLink(name string) string {
@@ -121,18 +183,6 @@ func mdType(pkg *Package, typ types.Type) string {
 	default:
 		return "???"
 	}
-}
-
-func sortedNames(pkg *Package) []string {
-	var names []string
-	for name := range pkg.Structs {
-		names = append(names, name)
-	}
-	for name := range pkg.Constants {
-		names = append(names, name)
-	}
-	sort.Strings(names)
-	return names
 }
 
 func packageIdent(pkg string) string {
@@ -198,6 +248,7 @@ func ParsePackage(path string) (*Package, error) {
 		structs[name] = Struct{
 			Name:   typ.DocType.Name,
 			Doc:    fmtRawDoc(typ.DocType.Doc),
+			Type:   typ.Named,
 			Fields: structFields(pkgs, typ),
 		}
 	}
@@ -257,6 +308,7 @@ func constValues(scope *types.Scope, consts []*doc.Value) map[*types.Named][]Val
 type Struct struct {
 	Name   string
 	Doc    string
+	Type   types.Type
 	Fields []Field
 }
 
@@ -269,36 +321,36 @@ type Field struct {
 }
 
 func structFields(pkgs map[string]*internal.Package, s *internal.Struct) []Field {
-	var list []Field
+	var fields []Field
 	for i, n := 0, s.Struct.NumFields(); i < n; i++ {
 		f := s.Struct.Field(i)
 		if !f.Exported() {
 			continue
 		}
-		doc := s.FieldDoc(f.Name())
 		tag := jsontags.Parse(reflect.StructTag(s.Struct.Tag(i)).Get("json"))
 		if tag.Contains("inline") {
 			o := f.Type().(*types.Named).Obj()
-			s := pkgs[o.Pkg().Path()].Structs[o.Name()]
-			list = append(list, structFields(pkgs, s)...)
+			inline := structFields(pkgs, pkgs[o.Pkg().Path()].Structs[o.Name()])
+			fields = append(fields, inline...)
 			continue
 		}
 		name := tag.Name
 		if name == "" {
 			name = f.Name()
 		}
+		doc := s.FieldDoc(f.Name())
 		required := true
 		if tag.Contains("omitempty") || hasComment(doc, "+optional") {
 			required = false
 		}
-		list = append(list, Field{
+		fields = append(fields, Field{
 			Name:     name,
 			Doc:      fmtRawDoc(doc.Text()),
 			Type:     f.Type(),
 			Required: required,
 		})
 	}
-	return list
+	return fields
 }
 
 func hasComment(grp *ast.CommentGroup, comment string) bool {
@@ -357,12 +409,5 @@ func fmtRawDoc(rawDoc string) string {
 		}
 	}
 
-	postDoc := strings.TrimRight(buffer.String(), "\n")
-	postDoc = strings.Replace(postDoc, "\\\"", "\"", -1) // replace user's \" to "
-	postDoc = strings.Replace(postDoc, "\"", "\\\"", -1) // Escape "
-	postDoc = strings.Replace(postDoc, "\n", "<br/>", -1)
-	postDoc = strings.Replace(postDoc, "\t", "\\t", -1)
-	postDoc = strings.Replace(postDoc, "|", "\\|", -1)
-
-	return postDoc
+	return strings.TrimSpace(buffer.String())
 }

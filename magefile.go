@@ -19,10 +19,12 @@ import (
 	"sync"
 	"time"
 
+	"github.com/machinezone/configmapsecrets/pkg/api/v1alpha1"
 	"github.com/machinezone/configmapsecrets/pkg/genapi"
 	"github.com/magefile/mage/mg"
 	"github.com/magefile/mage/sh"
 	magetarget "github.com/magefile/mage/target"
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
 const (
@@ -466,7 +468,11 @@ func generateDocs() error {
 		return err
 	}
 	buf := bytes.NewBuffer(nil)
-	if err := genapi.WriteMarkdown(buf, pkg); err != nil {
+	scheme := runtime.NewScheme()
+	if err := v1alpha1.AddToScheme(scheme); err != nil {
+		return err
+	}
+	if err := genapi.WriteMarkdown(buf, pkg, genapi.WithScheme(scheme)); err != nil {
 		return err
 	}
 	return writeFile("docs/api.md", buf.String())

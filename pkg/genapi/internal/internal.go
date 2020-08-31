@@ -26,7 +26,7 @@ type Package struct {
 // LoadPackage loads the package with the given path and all of its dependencies.
 func LoadPackage(path string, fset *token.FileSet) (*Package, map[string]*Package, error) {
 	cfg := &packages.Config{
-		Mode: packages.NeedSyntax | packages.NeedName | packages.NeedTypes | packages.NeedDeps | packages.NeedImports, // | packages.NeedTypesInfo,
+		Mode: packages.NeedSyntax | packages.NeedName | packages.NeedTypes | packages.NeedDeps | packages.NeedImports,
 		Fset: fset,
 	}
 	loaded, err := packages.Load(cfg, path)
@@ -87,8 +87,9 @@ func Packages(loaded []*packages.Package) map[string]*Package {
 				}
 				xPkg.Structs[dt.Name] = &Struct{
 					DocType:   dt,
-					AstStruct: st,
+					Named:     named,
 					Struct:    typ,
+					AstStruct: st,
 				}
 			}
 		}
@@ -106,8 +107,9 @@ type Basic struct {
 // Struct represents a struct type.
 type Struct struct {
 	DocType   *doc.Type
-	AstStruct *ast.StructType
+	Named     *types.Named
 	Struct    *types.Struct
+	AstStruct *ast.StructType
 }
 
 // AstField returns the named ast.Field if it exists.
