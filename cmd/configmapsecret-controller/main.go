@@ -61,10 +61,11 @@ func init() {
 
 func main() {
 	var (
-		healthAddr     string
-		metricsAddr    string
-		allNamespaces  bool
-		leaderElection bool
+		healthAddr              string
+		metricsAddr             string
+		allNamespaces           bool
+		leaderElection          bool
+		leaderElectionNamespace string
 	)
 	flag.StringVar(&healthAddr, "health-addr", ":9090", "The address to which the health endpoint binds.")
 	flag.StringVar(&metricsAddr, "metrics-addr", ":9091", "The address to which the metric endpoint binds.")
@@ -72,6 +73,9 @@ func main() {
 		"Enable the contoller to manage all namespaces, instead of only its own namespace.")
 	flag.BoolVar(&leaderElection, "enable-leader-election", false,
 		"Enable leader election, which will ensure there is only one active controller.")
+	flag.StringVar(&leaderElectionNamespace, "leader-election-namespace", "",
+		"Namespace of leader election object. Defaults to `kube-system` when all-namespaces is enabled "+
+			"and to the controller's own namespace when all-namespaces is disabled.")
 	logCfg := zapr.DefaultConfig().RegisterCommonFlags(flag.CommandLine)
 	flag.Parse()
 
@@ -88,19 +92,24 @@ func main() {
 	cfg, err := config.GetConfig()
 	check(err, "Unable to load kubeconfig")
 
+	namespace := ""
+	electionNamespace := "kube-system" // Default to cluster-wide leader election.
+	if !allNamespaces {
+		namespace, err = currentNamespace()
+		check(err, "Unable to detect namespace")
+		electionNamespace = namespace // Default to namespace-wide leader election.
+	}
+	if leaderElectionNamespace != "" {
+		electionNamespace = leaderElectionNamespace // Override leader election namespace.
+	}
 	opts := manager.Options{
 		Scheme:                  scheme,
 		HealthProbeBindAddress:  healthAddr,
 		MetricsBindAddress:      metricsAddr,
+		Namespace:               namespace,
 		LeaderElection:          leaderElection,
 		LeaderElectionID:        "configmapsecret-controller-leader",
-		LeaderElectionNamespace: "kube-system", // cluster-wide leader
-	}
-	if !allNamespaces {
-		namespace, err := currentNamespace()
-		check(err, "Unable to detect namespace")
-		opts.LeaderElectionNamespace = namespace // namespace-wide leader
-		opts.Namespace = namespace
+		LeaderElectionNamespace: electionNamespace,
 	}
 
 	mgr, err := manager.New(cfg, opts)
