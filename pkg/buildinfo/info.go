@@ -3,11 +3,13 @@ package buildinfo
 import (
 	"bytes"
 	"html/template"
+	"os"
 	"runtime"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/go-logr/logr"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -74,6 +76,32 @@ var tmpl = template.Must(template.New("version").Parse(`{{.binary}}
   build time: {{.buildTime}}
   go version: {{.goVersion}}
 `))
+
+// Log logs info about the process, build, and runtime to the logger.
+func Log(logger logr.Logger) {
+	logger.Info(
+		"Process info",
+		"command", os.Args[0],
+		"args", os.Args[1:],
+	)
+	logger.Info(
+		"Build info",
+		"binary", binary,
+		"version", version,
+		"repo", repo,
+		"branch", branch,
+		"revision", revision,
+		"build_time", buildTime,
+	)
+	logger.Info(
+		"Runtime info",
+		"version", runtime.Version(),
+		"os", runtime.GOOS,
+		"arch", runtime.GOARCH,
+		"gomaxprocs", runtime.GOMAXPROCS(0),
+		"cpus", runtime.NumCPU(),
+	)
+}
 
 // Print returns a string containing build information.
 func Print() string {

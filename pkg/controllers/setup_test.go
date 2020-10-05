@@ -12,10 +12,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/go-logr/zapr"
+	"bursavich.dev/zapr"
 	"github.com/machinezone/configmapsecrets/pkg/api/v1alpha1"
-	"github.com/machinezone/configmapsecrets/pkg/mzlog"
-	"go.uber.org/zap/zapcore"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	clientscheme "k8s.io/client-go/kubernetes/scheme"
@@ -32,11 +30,9 @@ var (
 )
 
 func init() {
-	logCfg := mzlog.DefaultConfig()
-	logCfg.Level = zapcore.DebugLevel
-	logCfg.Encoder = mzlog.ConsoleType
+	logCfg := zapr.DevelopmentConfig()
 	logCfg.EnableStacktrace = false
-	log.SetLogger(zapr.NewLogger(mzlog.NewZapLogger(logCfg)))
+	log.SetLogger(zapr.NewLogger(logCfg))
 }
 
 func TestMain(m *testing.M) {

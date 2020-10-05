@@ -3,10 +3,11 @@ module github.com/machinezone/configmapsecrets
 go 1.14
 
 require (
+	bursavich.dev/zapr v0.0.0-20200927194150-26ccbd0b6473
 	cloud.google.com/go v0.64.0 // indirect
 	github.com/Azure/go-autorest/autorest v0.11.4 // indirect
-	github.com/go-logr/logr v0.2.1-0.20200730175230-ee2de8da5be6
-	github.com/go-logr/zapr v0.2.0
+	github.com/go-logr/logr v0.2.1
+	github.com/go-logr/zapr v0.2.0 // indirect
 	github.com/google/go-cmp v0.5.2
 	github.com/google/gofuzz v1.2.0 // indirect
 	github.com/googleapis/gnostic v0.5.1 // indirect
@@ -14,12 +15,10 @@ require (
 	github.com/magefile/mage v1.10.0
 	github.com/onsi/ginkgo v1.14.0 // indirect
 	github.com/prometheus/client_golang v1.7.1
-	github.com/prometheus/common v0.13.0 // indirect
 	github.com/stretchr/testify v1.6.1 // indirect
-	go.uber.org/zap v1.15.0
+	go.uber.org/zap v1.16.0
 	golang.org/x/crypto v0.0.0-20200820211705-5c72a883971a // indirect
 	golang.org/x/net v0.0.0-20200822124328-c89045814202 // indirect
-	golang.org/x/sys v0.0.0-20200826173525-f9321e4c35a6 // indirect
 	golang.org/x/time v0.0.0-20200630173020-3af7569d3a1e // indirect
 	golang.org/x/tools v0.0.0-20200823205832-c024452afbcd
 	gomodules.xyz/jsonpatch/v2 v2.1.0 // indirect

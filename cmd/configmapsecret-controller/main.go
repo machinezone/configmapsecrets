@@ -22,11 +22,10 @@ import (
 	"io/ioutil"
 	"os"
 
-	"github.com/go-logr/zapr"
+	"bursavich.dev/zapr"
 	"github.com/machinezone/configmapsecrets/pkg/api/v1alpha1"
 	"github.com/machinezone/configmapsecrets/pkg/buildinfo"
 	"github.com/machinezone/configmapsecrets/pkg/controllers"
-	"github.com/machinezone/configmapsecrets/pkg/mzlog"
 	"go.uber.org/zap"
 	"k8s.io/apimachinery/pkg/runtime"
 	clientscheme "k8s.io/client-go/kubernetes/scheme"
@@ -42,7 +41,7 @@ import (
 )
 
 var (
-	logger *zap.Logger
+	logger zapr.Logger
 	scheme = runtime.NewScheme()
 )
 
@@ -73,14 +72,17 @@ func main() {
 		"Enable the contoller to manage all namespaces, instead of only its own namespace.")
 	flag.BoolVar(&leaderElection, "enable-leader-election", false,
 		"Enable leader election, which will ensure there is only one active controller.")
-	logCfg := mzlog.DefaultConfig().RegisterCommonFlags(flag.CommandLine)
+	logCfg := zapr.DefaultConfig().RegisterCommonFlags(flag.CommandLine)
 	flag.Parse()
 
-	logger = mzlog.NewZapLogger(logCfg)
-	mzlog.Process(logger)
-	log.SetLogger(zapr.NewLogger(logger))
+	logMetrics := zapr.NewPrometheusMetrics()
+	logCfg.Metrics = logMetrics
 
-	check(metrics.Registry.Register(logCfg.Metrics), "Unable to register logging metrics")
+	logger = zapr.NewLogger(logCfg)
+	buildinfo.Log(logger)
+	log.SetLogger(logger)
+
+	check(metrics.Registry.Register(logMetrics), "Unable to register logging metrics")
 	check(metrics.Registry.Register(buildinfo.Collector()), "Unable to register build metrics")
 
 	cfg, err := config.GetConfig()
@@ -123,11 +125,12 @@ func currentNamespace() (string, error) {
 }
 
 func check(err error, msg string) {
-	if err != nil {
-		if logger == nil {
-			fmt.Fprintf(os.Stderr, "%s: %v", msg, err)
-			os.Exit(1)
-		}
-		logger.WithOptions(zap.AddCallerSkip(1)).Fatal(msg, zap.Error(err))
+	if err == nil {
+		return
 	}
+	if logger == nil {
+		fmt.Fprintf(os.Stderr, "%s: %v", msg, err)
+		os.Exit(1)
+	}
+	logger.Underlying().WithOptions(zap.AddCallerSkip(1)).Fatal(msg, zap.Error(err))
 }
