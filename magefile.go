@@ -31,8 +31,9 @@ const (
 	repo = "github.com/machinezone/configmapsecrets"
 
 	goVersion  = "1.15"
+	k8sVersion = "1.19.2"
 	buildImage = "golang:" + goVersion + "-alpine"
-	testImage  = "kubebuilder-golang-" + goVersion + "-alpine"
+	testImage  = "kubebuilder-tools-" + k8sVersion + "-go" + goVersion + "-alpine"
 	baseImage  = "gcr.io/distroless/static:latest"
 )
 
@@ -202,9 +203,8 @@ func buildTestImg() error {
 	defer f.Close()
 	buf := bufio.NewWriter(f)
 	fmt.Fprintf(buf, "FROM %s\n", buildImage)
-	fmt.Fprintf(buf, `RUN wget -q -O - "https://go.kubebuilder.io/dl/latest/$(go env GOOS)/$(go env GOARCH)"`)
-	fmt.Fprintf(buf, " | tar -xz -C /tmp/")
-	fmt.Fprintf(buf, " && mv /tmp/kubebuilder* /usr/local/kubebuilder\n")
+	fmt.Fprintf(buf, `RUN wget --quiet -O - "https://storage.googleapis.com/kubebuilder-tools/kubebuilder-tools-`+k8sVersion+`-$(go env GOOS)-$(go env GOARCH).tar.gz"`)
+	fmt.Fprintf(buf, " | tar --extract --gzip --directory /usr/local\n")
 	if err := buf.Flush(); err != nil {
 		return err
 	}
