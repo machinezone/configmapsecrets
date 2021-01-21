@@ -56,6 +56,21 @@ metadata:
   namespace: kube-system
 rules:
 - apiGroups:
+  - coordination/v1
+  resources:
+  - lease
+  verbs:
+  - create
+- apiGroups:
+  - coordination/v1
+  resourceNames:
+  - configmapsecret-controller-leader
+  resources:
+  - lease
+  verbs:
+  - get
+  - update
+- apiGroups:
   - ""
   resources:
   - configmaps

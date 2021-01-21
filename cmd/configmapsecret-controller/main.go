@@ -53,11 +53,14 @@ func init() {
 }
 
 // RBAC for leader election, scoped to the namespace used by default manifests (kube-system).
+// Migrating from core/v1.ConfigMap to coordination/v1.Lease.
 //
 // N.B.: RBAC cannot use resourceNames with "list", "watch", "create", or "deletecollection" verbs.
 //
 // +kubebuilder:rbac:namespace=kube-system,groups=core,resources=configmaps,verbs=create
 // +kubebuilder:rbac:namespace=kube-system,groups=core,resources=configmaps,verbs=get;update,resourceNames=configmapsecret-controller-leader
+// +kubebuilder:rbac:namespace=kube-system,groups=coordination/v1,resources=lease,verbs=create
+// +kubebuilder:rbac:namespace=kube-system,groups=coordination/v1,resources=lease,verbs=get;update,resourceNames=configmapsecret-controller-leader
 // +kubebuilder:rbac:namespace=kube-system,groups=core,resources=events,verbs=create;patch
 
 func main() {
