@@ -31,13 +31,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
-	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 )
-
-var pkgLog = log.Log.WithName("controllers")
 
 // ConfigMapSecret reconciles a ConfigMapSecret object
 type ConfigMapSecret struct {
@@ -54,38 +51,12 @@ type ConfigMapSecret struct {
 	testNotifyFn func(types.NamespacedName)
 }
 
-// InjectClient injects the client into the reconciler.
-func (r *ConfigMapSecret) InjectClient(client client.Client) error {
-	r.client = client
-	return nil
-}
-
-// InjectLogger injects the logger into the reconciler.
-func (r *ConfigMapSecret) InjectLogger(logger logr.Logger) error {
-	r.logger = logger.WithName("controller").WithName("ConfigMapSecret")
-	return nil
-}
-
-// InjectScheme injects the scheme into the reconciler.
-func (r *ConfigMapSecret) InjectScheme(scheme *runtime.Scheme) error {
-	r.scheme = scheme
-	return nil
-}
-
-// InjectEventRecorder injects the recorder into the reconciler.
-func (r *ConfigMapSecret) InjectEventRecorder(recorder record.EventRecorder) error {
-	r.recorder = recorder
-	return nil
-}
-
 // SetupWithManager sets up the reconciler with the manager.
 func (r *ConfigMapSecret) SetupWithManager(manager manager.Manager) error {
-	if r.logger == nil {
-		r.logger = pkgLog
-	}
-	if r.recorder == nil {
-		r.recorder = manager.GetEventRecorderFor("configmapsecret-controller")
-	}
+	r.client = manager.GetClient()
+	r.scheme = manager.GetScheme()
+	r.logger = manager.GetLogger().WithName("controller").WithName("ConfigMapSecret")
+	r.recorder = manager.GetEventRecorderFor("configmapsecret-controller")
 
 	return builder.ControllerManagedBy(manager).
 		For(&v1alpha1.ConfigMapSecret{}).
