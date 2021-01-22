@@ -108,16 +108,14 @@ func (r *ConfigMapSecret) SetupWithManager(manager manager.Manager) error {
 }
 
 func (r *ConfigMapSecret) configMapEventHandler() handler.EventHandler {
-	return &handler.EnqueueRequestsFromMapFunc{
-		ToRequests: handler.ToRequestsFunc(func(obj handler.MapObject) []reconcile.Request {
-			namespace := obj.Meta.GetNamespace()
-			name := obj.Meta.GetName()
+	return handler.EnqueueRequestsFromMapFunc(func(obj client.Object) []reconcile.Request {
+		namespace := obj.GetNamespace()
+		name := obj.GetName()
 
-			r.mu.RLock()
-			defer r.mu.RUnlock()
-			return toReqs(namespace, r.configMaps.srcs(namespace, name))
-		}),
-	}
+		r.mu.RLock()
+		defer r.mu.RUnlock()
+		return toReqs(namespace, r.configMaps.srcs(namespace, name))
+	})
 }
 
 func (r *ConfigMapSecret) secretEventHandler(q workqueue.RateLimitingInterface, secret *corev1.Secret, deleted bool) {
@@ -170,11 +168,10 @@ func (r *ConfigMapSecret) setRefs(namespace, name string, secrets, configMaps ma
 
 // Reconcile reconciles the state of the cluster with the desired state of a
 // ConfigMapSecret.
-func (r *ConfigMapSecret) Reconcile(req reconcile.Request) (reconcile.Result, error) {
+func (r *ConfigMapSecret) Reconcile(ctx context.Context, req reconcile.Request) (reconcile.Result, error) {
 	if r.testNotifyFn != nil {
 		defer r.testNotifyFn(req.NamespacedName)
 	}
-	ctx := context.TODO()
 	log := r.logger.WithValues("configmapsecret", req.NamespacedName)
 
 	// Fetch the ConfigMapSecret instance

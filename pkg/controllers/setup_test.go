@@ -101,7 +101,7 @@ func newTestReconciler(t *testing.T) *testReconciler {
 
 	go func() {
 		defer close(r.closed)
-		r.err = mgr.Start(ctx.Done())
+		r.err = mgr.Start(ctx)
 	}()
 
 	return r

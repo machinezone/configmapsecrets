@@ -5,7 +5,6 @@
 package zapr
 
 import (
-	"github.com/prometheus/client_golang/prometheus"
 	"go.uber.org/zap"
 	"go.uber.org/zap/buffer"
 	"go.uber.org/zap/zapcore"
@@ -24,74 +23,6 @@ type Metrics interface {
 
 	// ObserveEncoderError observes an error encoding an entry for the named logger.
 	ObserveEncoderError(logger string)
-}
-
-// PrometheusMetrics represent the ability to observe metrics for Prometheus.
-type PrometheusMetrics interface {
-	prometheus.Collector
-	Metrics
-}
-
-// NewPrometheusMetrics returns new PrometheusMetrics.
-func NewPrometheusMetrics() PrometheusMetrics {
-	return &promMetrics{
-		lines: prometheus.NewCounterVec(
-			prometheus.CounterOpts{
-				Name: "log_lines_total",
-				Help: "Total number of log lines.",
-			},
-			[]string{"name", "level"},
-		),
-		bytes: prometheus.NewCounterVec(
-			prometheus.CounterOpts{
-				Name: "log_bytes_total",
-				Help: "Total bytes of encoded log lines.",
-			},
-			[]string{"name", "level"},
-		),
-		errors: prometheus.NewCounterVec(
-			prometheus.CounterOpts{
-				Name: "log_encoder_errors_total",
-				Help: "Total number of log entry encoding failures.",
-			},
-			[]string{"name"},
-		),
-	}
-}
-
-type promMetrics struct {
-	lines  *prometheus.CounterVec
-	bytes  *prometheus.CounterVec
-	errors *prometheus.CounterVec
-}
-
-func (m *promMetrics) Describe(ch chan<- *prometheus.Desc) {
-	m.lines.Describe(ch)
-	m.bytes.Describe(ch)
-	m.errors.Describe(ch)
-}
-
-func (m *promMetrics) Collect(ch chan<- prometheus.Metric) {
-	m.lines.Collect(ch)
-	m.bytes.Collect(ch)
-	m.errors.Collect(ch)
-}
-
-func (m *promMetrics) Init(logger string) {
-	for _, lvl := range []zapcore.Level{zap.InfoLevel, zap.ErrorLevel} {
-		m.lines.WithLabelValues(logger, lvl.String())
-		m.bytes.WithLabelValues(logger, lvl.String())
-	}
-	m.errors.WithLabelValues(logger)
-}
-
-func (m *promMetrics) ObserveEntryLogged(logger string, level string, bytes int) {
-	m.bytes.WithLabelValues(logger, level).Add(float64(bytes))
-	m.lines.WithLabelValues(logger, level).Inc()
-}
-
-func (m *promMetrics) ObserveEncoderError(logger string) {
-	m.errors.WithLabelValues(logger).Inc()
 }
 
 type metricsEncoder struct {

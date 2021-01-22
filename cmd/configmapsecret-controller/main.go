@@ -23,6 +23,7 @@ import (
 	"os"
 
 	"bursavich.dev/zapr"
+	"bursavich.dev/zapr/zaprprom"
 	"github.com/machinezone/configmapsecrets/pkg/api/v1alpha1"
 	"github.com/machinezone/configmapsecrets/pkg/buildinfo"
 	"github.com/machinezone/configmapsecrets/pkg/controllers"
@@ -79,7 +80,7 @@ func main() {
 	logCfg := zapr.DefaultConfig().RegisterCommonFlags(flag.CommandLine)
 	flag.Parse()
 
-	logMetrics := zapr.NewPrometheusMetrics()
+	logMetrics := zaprprom.NewMetrics()
 	logCfg.Metrics = logMetrics
 
 	logger = zapr.NewLogger(logCfg)
