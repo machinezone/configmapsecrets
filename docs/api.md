@@ -1,6 +1,7 @@
-# API
+# secrets&#46;mz&#46;com/v1alpha1
 
 **Note:** This document is generated from code and comments. Do not edit it directly.
+
 ## Table of Contents
 * [ConfigMapSecret](#configmapsecret)
 * [ConfigMapSecretCondition](#configmapsecretcondition)

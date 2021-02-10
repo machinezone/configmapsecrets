@@ -36,6 +36,7 @@ import (
 type option struct {
 	scheme *runtime.Scheme
 	types  map[string]schema.GroupVersionKind
+	gv     schema.GroupVersion
 }
 
 // An Option applies an option.
@@ -58,6 +59,13 @@ func WithScheme(scheme *runtime.Scheme) Option {
 	})
 }
 
+// WithGroupVersion returns an option that sets the GroupVersion.
+func WithGroupVersion(gv schema.GroupVersion) Option {
+	return optionFunc(func(o *option) {
+		o.gv = gv
+	})
+}
+
 // WriteMarkdown writes the API of pkg as markdown to w.
 func WriteMarkdown(w io.Writer, pkg *Package, options ...Option) error {
 	o := &option{}
@@ -65,16 +73,32 @@ func WriteMarkdown(w io.Writer, pkg *Package, options ...Option) error {
 		opt.apply(o)
 	}
 	b := bufio.NewWriter(w)
-	printHeader(b)
+	printHeader(b, pkg, o)
 	printTOC(b, pkg)
 	printTypes(b, pkg, o)
 	return b.Flush()
 }
 
-func printHeader(w io.Writer) {
-	fmt.Fprintln(w, "# API")
+func printHeader(w io.Writer, pkg *Package, opt *option) {
+	title := "API"
+	if gv, ok := pkgGroupVersion(pkg, opt); ok {
+		title = strings.Replace(gv.String(), ".", "&#46;", -1)
+	}
+	fmt.Fprintln(w, "#", title)
 	fmt.Fprintln(w)
-	fmt.Fprint(w, "**Note:** This document is generated from code and comments. Do not edit it directly.")
+	fmt.Fprintln(w, "**Note:** This document is generated from code and comments. Do not edit it directly.")
+}
+
+func pkgGroupVersion(pkg *Package, opt *option) (schema.GroupVersion, bool) {
+	if !opt.gv.Empty() {
+		return opt.gv, true
+	}
+	for _, s := range pkg.Structs {
+		if gvk, ok := opt.types[s.Type.String()]; ok {
+			return gvk.GroupVersion(), true
+		}
+	}
+	return schema.GroupVersion{}, false
 }
 
 func printTOC(w io.Writer, pkg *Package) {
