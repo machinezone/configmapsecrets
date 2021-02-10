@@ -187,11 +187,21 @@ func mdType(pkg *Package, typ types.Type) string {
 
 func packageIdent(pkg string) string {
 	base := path.Base(pkg)
-	parent := path.Base(path.Dir(pkg))
-	if !isVersion(base) || parent == "." || parent == ".." || parent == "/" {
-		return base
+	cleanBase := removeNonAlphaNum(base)
+	cleanParent := removeNonAlphaNum(path.Base(path.Dir(pkg)))
+	if !isVersion(base) || cleanParent == "" {
+		return cleanBase
 	}
-	return parent + base
+	return cleanParent + cleanBase
+}
+
+func removeNonAlphaNum(s string) string {
+	return strings.Map(func(r rune) rune {
+		if !unicode.IsLetter(r) && !unicode.IsDigit(r) {
+			return -1
+		}
+		return r
+	}, s)
 }
 
 var versionRE = regexp.MustCompile("^v([0-9]+)((alpha|beta)([0-9]+))?$")
