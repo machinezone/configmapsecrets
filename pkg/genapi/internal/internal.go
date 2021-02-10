@@ -71,7 +71,10 @@ func Packages(loaded []*packages.Package) map[string]*Package {
 		pkgs[p.PkgPath] = xPkg
 		scope := p.Types.Scope()
 		for _, dt := range docPkg.Types {
-			named := scope.Lookup(dt.Name).Type().(*types.Named)
+			named, ok := scope.Lookup(dt.Name).Type().(*types.Named)
+			if !ok {
+				continue
+			}
 			switch typ := named.Underlying().(type) {
 			case *types.Basic:
 				xPkg.Basics[dt.Name] = &Basic{

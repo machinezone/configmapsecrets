@@ -302,7 +302,10 @@ func constValues(scope *types.Scope, consts []*doc.Value) map[*types.Named][]Val
 			}
 			for _, n := range spec.Names {
 				obj := scope.Lookup(n.Name)
-				typ := obj.Type().(*types.Named)
+				typ, ok := obj.Type().(*types.Named)
+				if !ok {
+					continue
+				}
 				cvs[typ] = append(cvs[typ], Value{
 					Doc:   doc,
 					Name:  n.Name,
