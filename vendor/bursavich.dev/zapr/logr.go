@@ -18,10 +18,10 @@ import (
 
 // Logger represents the ability to log messages, both errors and not.
 type Logger interface {
-	// Logger is the main logging interface. All methods that return a logr.Logger
-	// (e.g. V, WithValues, WithName) will return a value implementing this Logger
-	// interface (e.g. with the additional Underlying and Flush methods).
-	logr.Logger
+	// This is the main logging interface. All methods that return a logr.Logger
+	// (e.g. V, WithValues, WithName, WithCallDepth) will return a value implementing
+	// zapr.Logger (e.g. with the additional Underlying and Flush methods).
+	logr.CallDepthLogger
 
 	// Underlying returns the underlying *zap.Logger with no caller skips.
 	// It may return nil if the logger is disabled.
@@ -44,12 +44,14 @@ func (noopLogger) Error(err error, msg string, keysAndValues ...interface{}) {}
 func (noopLogger) V(level int) logr.Logger                                   { return noop }
 func (noopLogger) WithValues(keysAndValues ...interface{}) logr.Logger       { return noop }
 func (noopLogger) WithName(name string) logr.Logger                          { return noop }
+func (noopLogger) WithCallDepth(depth int) logr.Logger                       { return noop }
 func (noopLogger) Underlying() *zap.Logger                                   { return nil }
 func (noopLogger) Flush() error                                              { return nil }
 
 type zapLogr struct {
 	underlying *zap.Logger
 	logger     *zap.Logger
+	depth      int
 	errKey     string
 	logLevel   int
 	maxLevel   int
@@ -58,14 +60,16 @@ type zapLogr struct {
 
 // NewLogger creates a new Logger with the given Config.
 func NewLogger(c *Config) Logger {
+	const depth = 1
 	underlying := newZapLogger(c)
-	logger := underlying.WithOptions(zap.AddCallerSkip(1))
+	logger := underlying.WithOptions(zap.AddCallerSkip(depth))
 	if c.Metrics != nil {
 		c.Metrics.Init(loggerName(logger))
 	}
 	return &zapLogr{
 		underlying: underlying,
 		logger:     logger,
+		depth:      depth,
 		errKey:     c.ErrorKey,
 		logLevel:   0,
 		maxLevel:   c.Level,
@@ -109,7 +113,7 @@ func (z *zapLogr) sweeten(kvs []interface{}) []zapcore.Field {
 }
 
 func (z *zapLogr) sweetenDPanic(msg string, fields ...zapcore.Field) {
-	z.logger.WithOptions(zap.AddCallerSkip(2)).DPanic(msg, fields...)
+	z.logger.WithOptions(zap.AddCallerSkip(z.depth+1)).DPanic(msg, fields...)
 }
 
 func (z *zapLogr) Enabled() bool { return true }
@@ -154,10 +158,20 @@ func (z *zapLogr) WithValues(keysAndValues ...interface{}) logr.Logger {
 func (z *zapLogr) WithName(name string) logr.Logger {
 	v := *z
 	v.underlying = v.underlying.Named(name)
-	v.logger = v.underlying.WithOptions(zap.AddCallerSkip(1))
+	v.logger = v.underlying.WithOptions(zap.AddCallerSkip(v.depth))
 	if v.metrics != nil {
 		v.metrics.Init(loggerName(v.logger))
 	}
+	return &v
+}
+
+func (z *zapLogr) WithCallDepth(depth int) logr.Logger {
+	if depth == 0 {
+		return z
+	}
+	v := *z
+	v.depth += depth
+	v.logger = v.underlying.WithOptions(zap.AddCallerSkip(v.depth))
 	return &v
 }
 
@@ -166,24 +180,25 @@ func (z *zapLogr) Underlying() *zap.Logger { return z.underlying }
 func (z *zapLogr) Flush() error { return z.logger.Sync() }
 
 // NewStdInfoLogger returns a *log.Logger which writes to the supplied Logger's Info method.
-func NewStdInfoLogger(logger Logger) *log.Logger {
+func NewStdInfoLogger(logger logr.CallDepthLogger) *log.Logger {
 	if !logger.Enabled() {
 		return newNoopStdLogWriter()
 	}
-	fn := logger.Underlying().WithOptions(zap.AddCallerSkip(3)).Info
+	fn := logger.WithCallDepth(3).Info
 	return log.New(stdLogWriterFunc(fn), "" /*prefix*/, 0 /*flags*/)
 }
 
 // NewStdErrorLogger returns a *log.Logger which writes to the supplied Logger's Error method.
-func NewStdErrorLogger(logger Logger) *log.Logger {
+func NewStdErrorLogger(logger logr.CallDepthLogger) *log.Logger {
 	if !logger.Enabled() {
 		return newNoopStdLogWriter()
 	}
-	fn := logger.Underlying().WithOptions(zap.AddCallerSkip(3)).Error
+	errFn := logger.WithCallDepth(4).Error
+	fn := func(msg string, _ ...interface{}) { errFn(nil, msg) }
 	return log.New(stdLogWriterFunc(fn), "" /*prefix*/, 0 /*flags*/)
 }
 
-type stdLogWriterFunc func(msg string, fields ...zap.Field)
+type stdLogWriterFunc func(msg string, _ ...interface{})
 
 func (fn stdLogWriterFunc) Write(b []byte) (int, error) {
 	v := bytes.TrimSpace(b)
