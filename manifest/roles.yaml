@@ -63,17 +63,17 @@ metadata:
   namespace: kube-system
 rules:
 - apiGroups:
-  - coordination/v1
+  - coordination.k8s.io
   resources:
-  - lease
+  - leases
   verbs:
   - create
 - apiGroups:
-  - coordination/v1
+  - coordination.k8s.io
   resourceNames:
   - configmapsecret-controller-leader
   resources:
-  - lease
+  - leases
   verbs:
   - get
   - update

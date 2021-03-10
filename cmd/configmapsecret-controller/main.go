@@ -59,8 +59,8 @@ func init() {
 //
 // +kubebuilder:rbac:namespace=kube-system,groups=core,resources=configmaps,verbs=create
 // +kubebuilder:rbac:namespace=kube-system,groups=core,resources=configmaps,verbs=get;update,resourceNames=configmapsecret-controller-leader
-// +kubebuilder:rbac:namespace=kube-system,groups=coordination/v1,resources=lease,verbs=create
-// +kubebuilder:rbac:namespace=kube-system,groups=coordination/v1,resources=lease,verbs=get;update,resourceNames=configmapsecret-controller-leader
+// +kubebuilder:rbac:namespace=kube-system,groups=coordination.k8s.io,resources=leases,verbs=create
+// +kubebuilder:rbac:namespace=kube-system,groups=coordination.k8s.io,resources=leases,verbs=get;update,resourceNames=configmapsecret-controller-leader
 
 func main() {
 	var (
