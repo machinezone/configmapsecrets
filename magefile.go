@@ -30,7 +30,7 @@ const (
 	name = "configmapsecret-controller"
 	repo = "github.com/machinezone/configmapsecrets"
 
-	goVersion  = "1.15"
+	goVersion  = "1.16"
 	k8sVersion = "1.19.2"
 	buildImage = "golang:" + goVersion + "-alpine"
 	testImage  = "kubebuilder-tools-" + k8sVersion + "-go" + goVersion + "-alpine"
