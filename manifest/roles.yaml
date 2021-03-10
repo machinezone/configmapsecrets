@@ -17,6 +17,13 @@ rules:
 - apiGroups:
   - ""
   resources:
+  - events
+  verbs:
+  - create
+  - update
+- apiGroups:
+  - ""
+  resources:
   - secrets
   verbs:
   - create
@@ -85,10 +92,3 @@ rules:
   verbs:
   - get
   - update
-- apiGroups:
-  - ""
-  resources:
-  - events
-  verbs:
-  - create
-  - patch

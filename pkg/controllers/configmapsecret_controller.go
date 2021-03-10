@@ -132,6 +132,7 @@ func (r *ConfigMapSecret) setRefs(namespace, name string, secrets, configMaps ma
 	r.configMaps.set(namespace, name, configMaps)
 }
 
+// +kubebuilder:rbac:groups=core,resources=events,verbs=create;update
 // +kubebuilder:rbac:groups=core,resources=configmaps,verbs=get;list;watch
 // +kubebuilder:rbac:groups=core,resources=secrets,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=secrets.mz.com,resources=configmapsecrets,verbs=get;list;watch;update;patch;delete

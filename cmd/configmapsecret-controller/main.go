@@ -61,7 +61,6 @@ func init() {
 // +kubebuilder:rbac:namespace=kube-system,groups=core,resources=configmaps,verbs=get;update,resourceNames=configmapsecret-controller-leader
 // +kubebuilder:rbac:namespace=kube-system,groups=coordination/v1,resources=lease,verbs=create
 // +kubebuilder:rbac:namespace=kube-system,groups=coordination/v1,resources=lease,verbs=get;update,resourceNames=configmapsecret-controller-leader
-// +kubebuilder:rbac:namespace=kube-system,groups=core,resources=events,verbs=create;patch
 
 func main() {
 	var (
