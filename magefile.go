@@ -5,6 +5,7 @@ package main
 import (
 	"bufio"
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"hash/fnv"
 	"io"
@@ -37,7 +38,52 @@ const (
 	baseImage  = "gcr.io/distroless/static:latest"
 )
 
-var arches = []string{"amd64", "arm", "arm64"}
+var (
+	arches     = []string{"amd64", "arm", "arm64"}
+	baseImages map[string]string
+)
+
+func archBaseImage(arch string) (string, error) {
+	if err := initBaseImages(); err != nil {
+		return "", err
+	}
+	img, ok := baseImages[arch]
+	if !ok {
+		return "", fmt.Errorf("architecture %s not found in base image", arch)
+	}
+	return img, nil
+}
+
+func initBaseImages() error {
+	if baseImages != nil {
+		return nil
+	}
+	out, err := sh.Output("docker", "manifest", "inspect", baseImage)
+	if err != nil {
+		return err
+	}
+	var v struct {
+		Manifests []struct {
+			Digest   string `json:"digest"`
+			Platform struct {
+				Arch string `json:"architecture"`
+				OS   string `json:"os"`
+			} `json:"platform"`
+		} `json:"manifests"`
+	}
+	if err := json.Unmarshal([]byte(out), &v); err != nil {
+		return err
+	}
+	name := strings.Split(baseImage, ":")[0]
+	baseImages = make(map[string]string)
+	for _, m := range v.Manifests {
+		if m.Platform.OS != "linux" {
+			continue
+		}
+		baseImages[m.Platform.Arch] = fmt.Sprintf("%s@%s", name, m.Digest)
+	}
+	return nil
+}
 
 var trg = target{name: name, repo: repo}
 
@@ -319,6 +365,12 @@ func Imgs() error {
 func buildImg(arch string) error {
 	fmt.Printf("building image for linux/%s\n", arch)
 
+	// Get architecture-specific base image
+	baseImage, err := archBaseImage(arch)
+	if err != nil {
+		return err
+	}
+
 	// Write temporary dockerfile
 	tmp, err := ioutil.TempFile("", arch)
 	if err != nil {
@@ -593,7 +645,19 @@ func image(arch string) string {
 
 func pullBuildImage() error { return pullImage(buildImage) }
 
-func pullBaseImage() error { return pullImage(baseImage) }
+func pullBaseImage() error {
+	for _, arch := range arches {
+		// Get architecture-specific base image
+		baseImage, err := archBaseImage(arch)
+		if err != nil {
+			return err
+		}
+		if err := pullImage(baseImage); err != nil {
+			return err
+		}
+	}
+	return nil
+}
 
 func pullImage(image string) error {
 	path := imagePullPath(image)
