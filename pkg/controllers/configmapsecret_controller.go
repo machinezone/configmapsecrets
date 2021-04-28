@@ -16,6 +16,7 @@ import (
 	"github.com/go-logr/logr"
 	"github.com/machinezone/configmapsecrets/pkg/api/v1alpha1"
 	"github.com/machinezone/configmapsecrets/third_party/kubernetes/forked/golang/expansion"
+	"github.com/prometheus/client_golang/prometheus"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -32,9 +33,19 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
+	"sigs.k8s.io/controller-runtime/pkg/metrics"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 )
+
+var missingValues = prometheus.NewCounterVec(prometheus.CounterOpts{
+	Name: "configmapsecret_controller_missing_value_render_errors_total",
+	Help: "Total number of ConfigMapSecret controller render errors due to missing required values.",
+}, []string{"namespace"})
+
+func init() {
+	metrics.Registry.MustRegister(missingValues)
+}
 
 // ConfigMapSecret reconciles a ConfigMapSecret object
 type ConfigMapSecret struct {
@@ -218,6 +229,7 @@ func (r *ConfigMapSecret) sync(ctx context.Context, log logr.Logger, cms *v1alph
 			}
 		}()
 		if isConfigError(err) {
+			missingValues.WithLabelValues(cms.Namespace).Inc()
 			log.Info("Unable to render ConfigMapSecret", "warning", err)
 			return true, nil
 		}
