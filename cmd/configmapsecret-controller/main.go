@@ -18,7 +18,6 @@ package main
 import (
 	"bytes"
 	"flag"
-	"fmt"
 	"io/ioutil"
 	"os"
 
@@ -27,7 +26,6 @@ import (
 	"github.com/machinezone/configmapsecrets/pkg/api/v1alpha1"
 	"github.com/machinezone/configmapsecrets/pkg/buildinfo"
 	"github.com/machinezone/configmapsecrets/pkg/controllers"
-	"go.uber.org/zap"
 	"k8s.io/apimachinery/pkg/runtime"
 	clientscheme "k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
@@ -42,8 +40,8 @@ import (
 )
 
 var (
-	logger zapr.Logger
-	scheme = runtime.NewScheme()
+	logger, sink = zapr.NewLogger()
+	scheme       = runtime.NewScheme()
 )
 
 func init() {
@@ -79,17 +77,18 @@ func main() {
 	flag.StringVar(&leaderElectionNamespace, "leader-election-namespace", "",
 		"Namespace of leader election object. Defaults to `kube-system` when all-namespaces is enabled "+
 			"and to the controller's own namespace when all-namespaces is disabled.")
-	logCfg := zapr.DefaultConfig().RegisterCommonFlags(flag.CommandLine)
+	zaprObserver := zaprprom.NewObserver()
+	zaprOptions := zapr.AllOptions(zapr.WithObserver(zaprObserver))
+	zapr.RegisterFlags(flag.CommandLine, zaprOptions...)
 	flag.Parse()
 
-	logMetrics := zaprprom.NewMetrics()
-	logCfg.Metrics = logMetrics
+	logger, sink = zapr.NewLogger(zaprOptions...)
+	defer sink.Flush()
 
-	logger = zapr.NewLogger(logCfg)
 	buildinfo.Log(logger)
 	log.SetLogger(logger)
 
-	check(metrics.Registry.Register(logMetrics), "Unable to register logging metrics")
+	check(metrics.Registry.Register(zaprObserver), "Unable to register logging metrics")
 	check(metrics.Registry.Register(buildinfo.Collector()), "Unable to register build metrics")
 
 	cfg, err := config.GetConfig()
@@ -140,9 +139,7 @@ func check(err error, msg string) {
 	if err == nil {
 		return
 	}
-	if logger == nil {
-		fmt.Fprintf(os.Stderr, "%s: %v", msg, err)
-		os.Exit(1)
-	}
-	logger.Underlying().WithOptions(zap.AddCallerSkip(1)).Fatal(msg, zap.Error(err))
+	sink.WithCallDepth(1).Error(err, "Fatal error")
+	sink.Flush()
+	os.Exit(1)
 }

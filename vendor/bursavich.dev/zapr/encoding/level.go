@@ -55,9 +55,9 @@ var (
 )
 
 func init() {
-	RegisterLevelEncoder(colorLevelEncoder)
-	RegisterLevelEncoder(lowercaseLevelEncoder)
-	RegisterLevelEncoder(uppercaseLevelEncoder)
+	must(RegisterLevelEncoder(colorLevelEncoder))
+	must(RegisterLevelEncoder(lowercaseLevelEncoder))
+	must(RegisterLevelEncoder(uppercaseLevelEncoder))
 }
 
 // ColorLevelEncoder serializes a Level to an all-caps string and adds color.

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: BSD-3-Clause
+//
 // Copyright 2020 Andy Bursavich. All rights reserved.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
@@ -56,10 +58,10 @@ var (
 )
 
 func init() {
-	RegisterDurationEncoder(stringDurationEncoder)
-	RegisterDurationEncoder(nanosDurationEncoder)
-	RegisterDurationEncoder(millisDurationEncoder)
-	RegisterDurationEncoder(secsDurationEncoder)
+	must(RegisterDurationEncoder(stringDurationEncoder))
+	must(RegisterDurationEncoder(nanosDurationEncoder))
+	must(RegisterDurationEncoder(millisDurationEncoder))
+	must(RegisterDurationEncoder(secsDurationEncoder))
 }
 
 // StringDurationEncoder serializes a time.Duration using its String method.

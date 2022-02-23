@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: BSD-3-Clause
+//
 // Copyright 2020 Andy Bursavich. All rights reserved.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
@@ -63,11 +65,11 @@ var (
 )
 
 func init() {
-	RegisterTimeEncoder(iso8601TimeEncoder)
-	RegisterTimeEncoder(millisTimeEncoder)
-	RegisterTimeEncoder(nanosTimeEncoder)
-	RegisterTimeEncoder(secsTimeEncoder)
-	RegisterTimeEncoder(rfc3339TimeEncoder)
+	must(RegisterTimeEncoder(iso8601TimeEncoder))
+	must(RegisterTimeEncoder(millisTimeEncoder))
+	must(RegisterTimeEncoder(nanosTimeEncoder))
+	must(RegisterTimeEncoder(secsTimeEncoder))
+	must(RegisterTimeEncoder(rfc3339TimeEncoder))
 }
 
 func encodeTimeLayout(t time.Time, layout string, e zapcore.PrimitiveArrayEncoder) {

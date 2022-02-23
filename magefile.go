@@ -1,4 +1,5 @@
-//+build mage
+//go:build mage
+// +build mage
 
 package main
 
@@ -31,8 +32,8 @@ const (
 	name = "configmapsecret-controller"
 	repo = "github.com/machinezone/configmapsecrets"
 
-	goVersion  = "1.16"
-	k8sVersion = "1.19.2"
+	goVersion  = "1.17"
+	k8sVersion = "1.23.3"
 	buildImage = "golang:" + goVersion + "-alpine"
 	testImage  = "kubebuilder-tools-" + k8sVersion + "-go" + goVersion + "-alpine"
 	baseImage  = "gcr.io/distroless/static:latest"
@@ -165,6 +166,8 @@ func Shell() error {
 		"-v", pwd+":/src",
 		"-v", cachePath("bin")+":/go/bin",
 		"-v", cachePath("cache")+":/go/cache",
+		"-v", cachePath("home")+":/home",
+		"--env", "HOME=/home",
 		"--env", "CGO_ENABLED=0",
 		"--env", "GO111MODULE=on",
 		"--env", "GOCACHE=/go/cache",
@@ -205,6 +208,8 @@ func Test() error {
 		"-v", pwd+":/src",
 		"-v", cachePath("bin")+":/go/bin",
 		"-v", cachePath("cache")+":/go/cache",
+		"-v", cachePath("home")+":/home",
+		"--env", "HOME=/home",
 		"--env", "CGO_ENABLED=0",
 		"--env", "GO111MODULE=on",
 		"--env", "GOCACHE=/go/cache",
@@ -315,6 +320,8 @@ func Bins() error {
 		"-v", pwd+":/src",
 		"-v", cachePath("bin")+":/go/bin",
 		"-v", cachePath("cache")+":/go/cache",
+		"-v", cachePath("home")+":/home",
+		"--env", "HOME=/home",
 		"--env", "CGO_ENABLED=0",
 		"--env", "GO111MODULE=on",
 		"--env", "GOCACHE=/go/cache",

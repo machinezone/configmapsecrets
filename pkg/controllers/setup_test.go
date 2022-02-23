@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"bursavich.dev/testr"
 	"bursavich.dev/zapr"
 	"github.com/machinezone/configmapsecrets/pkg/api/v1alpha1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -30,9 +31,8 @@ var (
 )
 
 func init() {
-	logCfg := zapr.DevelopmentConfig()
-	logCfg.EnableStacktrace = false
-	log.SetLogger(zapr.NewLogger(logCfg))
+	zlog, _ := zapr.NewLogger(zapr.WithDevelopmentOptions(true), zapr.WithStacktraceEnabled(false))
+	log.SetLogger(zlog)
 }
 
 func TestMain(m *testing.M) {
@@ -73,7 +73,7 @@ func newTestReconciler(t *testing.T) *testReconciler {
 	ctx, cancel := context.WithCancel(context.TODO())
 	mgr, err := manager.New(cfg, manager.Options{
 		Scheme: scheme,
-		Logger: nil,
+		Logger: testr.NewLogger(t),
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
