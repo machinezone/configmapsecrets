@@ -3,7 +3,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.8.0
+    controller-gen.kubebuilder.io/version: v0.9.2
   creationTimestamp: null
   name: configmapsecrets.secrets.mz.com
 spec:
@@ -118,6 +118,7 @@ spec:
                       required:
                       - key
                       type: object
+                      x-kubernetes-map-type: atomic
                     name:
                       description: Name of the template variable.
                       type: string
@@ -139,6 +140,7 @@ spec:
                       required:
                       - key
                       type: object
+                      x-kubernetes-map-type: atomic
                     value:
                       description: 'Variable references $(VAR_NAME) are expanded using
                         the previous defined environment variables in the ConfigMapSecret.
@@ -173,6 +175,7 @@ spec:
                           description: Specify whether the ConfigMap must be defined.
                           type: boolean
                       type: object
+                      x-kubernetes-map-type: atomic
                     prefix:
                       description: An optional identifier to prepend to each key.
                       type: string
@@ -187,6 +190,7 @@ spec:
                           description: Specify whether the Secret must be defined.
                           type: boolean
                       type: object
+                      x-kubernetes-map-type: atomic
                   type: object
                 type: array
             type: object
@@ -239,9 +243,3 @@ spec:
     storage: true
     subresources:
       status: {}
-status:
-  acceptedNames:
-    kind: ""
-    plural: ""
-  conditions: []
-  storedVersions: []
