@@ -4,10 +4,10 @@ metadata:
   name: configmapsecret-controller
   namespace: kube-system
   labels:
-    control-plane: configmapsecret-controller
+    app.kubernetes.io/name: configmapsecret-controller
 spec:
   selector:
-    control-plane: configmapsecret-controller
+    app.kubernetes.io/name: configmapsecret-controller
   ports:
     - name: http-metrics
       port: 9091
